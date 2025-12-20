@@ -1,0 +1,15 @@
+# ADR: Streaming Responses for LLM Chat
+
+Date: 2025-12-20
+Status: Accepted
+
+## Context
+LLM responses can be slow to generate. Users expect immediate feedback.
+
+## Decision
+We implemented Server-Sent Events (SSE) style streaming from the Flask backend to the vanilla JS frontend.
+
+## Consequences
+- Lower perceived latency for the user.
+- Real-time token-by-token rendering.
+- Requires handling streams in JavaScript using the Fetch API.
