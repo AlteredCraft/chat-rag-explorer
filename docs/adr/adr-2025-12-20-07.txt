@@ -1,0 +1,17 @@
+# ADR: Metrics Sidebar and Metadata Streaming
+
+Date: 2025-12-20
+Status: Accepted
+
+## Context
+As an educational RAG explorer, it's important to provide transparency into the LLM's operation, such as token usage and model identification. We need a UI space for these metrics that doesn't clutter the chat history.
+
+## Decision
+1.  **UI Layout**: Implemented a fixed-width, full-height right sidebar using a Flexbox layout.
+2.  **Streaming Protocol**: Since the backend yields a simple text stream, we introduced a specialized `__METADATA__:` prefix to transmit JSON-encoded metrics (token counts, model name) at the end of the stream without interrupting the text flow.
+3.  **Raw Logging**: Enabled raw JSON logging of every LLM chunk at the `DEBUG` level for deep inspection of the provider's response.
+
+## Consequences
+- The sidebar provides a permanent home for current and future session-wide context (metrics, RAG sources).
+- The `__METADATA__` protocol requires careful handling in the frontend to prevent markers from appearing in the UI.
+- Increased log volume in `DEBUG` mode due to full chunk serialization.

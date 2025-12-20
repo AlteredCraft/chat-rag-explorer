@@ -20,18 +20,74 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--bg-color);
     height: 100vh;
+    overflow: hidden;
+}
+
+.main-layout {
     display: flex;
-    justify-content: center;
+    width: 100%;
+    height: 100vh;
 }
 
 .app-container {
-    width: 100%;
-    max-width: 800px;
+    flex: 1;
     background-color: var(--chat-bg);
     display: flex;
     flex-direction: column;
     height: 100%;
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    max-width: none; /* Occupy remaining space */
+}
+
+.sidebar {
+    width: 300px;
+    background-color: #f8f9fa;
+    border-left: 1px solid var(--border-color);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    overflow-y: auto;
+}
+
+.sidebar h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    color: #666;
+    margin-bottom: 1rem;
+    letter-spacing: 0.05rem;
+}
+
+.sidebar-section {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 1.5rem;
+}
+
+.sidebar-section:last-child {
+    border-bottom: none;
+}
+
+.metric {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.8rem;
+    font-size: 0.95rem;
+}
+
+.metric .label {
+    color: #555;
+}
+
+.metric .value {
+    font-weight: 600;
+    color: #222;
+    font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.small {
+    font-size: 0.85rem;
+    color: #888;
+    line-height: 1.4;
 }
 
 header {

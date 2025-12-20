@@ -56,6 +56,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (done) break;
                 
                 const chunk = decoder.decode(value, { stream: true });
+                
+                // Check for metadata marker
+                if (chunk.startsWith('__METADATA__:')) {
+                    try {
+                        const metadataJson = chunk.replace('__METADATA__:', '');
+                        const usageData = JSON.parse(metadataJson);
+                        updateMetrics(usageData);
+                    } catch (e) {
+                        console.error('Failed to parse metadata', e);
+                    }
+                    continue; // Don't render metadata in chat
+                }
+
                 messageBuffer += chunk;
                 
                 // Parse markdown and sanitize
@@ -75,6 +88,13 @@ document.addEventListener('DOMContentLoaded', () => {
             messageInput.focus();
         }
     });
+
+    function updateMetrics(data) {
+        if (data.model) document.getElementById('metric-model').textContent = data.model;
+        if (data.prompt_tokens) document.getElementById('metric-prompt-tokens').textContent = data.prompt_tokens;
+        if (data.completion_tokens) document.getElementById('metric-completion-tokens').textContent = data.completion_tokens;
+        if (data.total_tokens) document.getElementById('metric-total-tokens').textContent = data.total_tokens;
+    }
 
     function appendMessage(role, text) {
         const messageDiv = document.createElement('div');

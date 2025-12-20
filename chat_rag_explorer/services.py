@@ -1,3 +1,4 @@
+import json
 import logging
 from openai import OpenAI
 from flask import current_app
@@ -26,6 +27,7 @@ class ChatService:
         logger.debug(f"User message: {message}")
 
         try:
+            # Note: stream_options={"include_usage": True} is required for token counts in streams
             stream = client.chat.completions.create(
                 model=target_model,
                 messages=[
@@ -33,14 +35,30 @@ class ChatService:
                     {"role": "user", "content": message},
                 ],
                 stream=True,
+                stream_options={"include_usage": True},
             )
 
             chunk_count = 0
             for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
+                # Log raw LLM response in debug mode
+                logger.debug(f"Raw chunk: {chunk.model_dump_json()}")
+
+                # Check for usage data (usually in the final chunk when stream_options is set)
+                if hasattr(chunk, "usage") and chunk.usage is not None:
+                    usage_data = {
+                        "prompt_tokens": chunk.usage.prompt_tokens,
+                        "completion_tokens": chunk.usage.completion_tokens,
+                        "total_tokens": chunk.usage.total_tokens,
+                        "model": chunk.model or target_model,
+                    }
+                    # Send as a special metadata marker
+                    yield f"__METADATA__:{json.dumps(usage_data)}"
+
+                if len(chunk.choices) > 0:
                     content = chunk.choices[0].delta.content
-                    chunk_count += 1
-                    yield content
+                    if content is not None:
+                        chunk_count += 1
+                        yield content
 
             logger.info(f"Stream completed successfully with {chunk_count} chunks")
 

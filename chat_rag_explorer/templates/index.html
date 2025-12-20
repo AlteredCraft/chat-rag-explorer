@@ -7,29 +7,58 @@
         <link rel="stylesheet" href="/static/style.css" />
     </head>
     <body>
-        <div class="app-container">
-            <header>
-                <h1>Chat RAG Explorer</h1>
-            </header>
+        <div class="main-layout">
+            <div class="app-container">
+                <header>
+                    <h1>Chat RAG Explorer</h1>
+                </header>
+                
+                <div id="chat-history" class="chat-history">
+                    <!-- Messages will appear here -->
+                </div>
 
-            <div id="chat-history" class="chat-history">
-                <!-- Messages will appear here -->
+                <div class="input-area">
+                    <form id="chat-form">
+                        <input
+                            type="text"
+                            id="message-input"
+                            placeholder="Type your message..."
+                            autocomplete="off"
+                        />
+                        <button type="submit">Send</button>
+                    </form>
+                </div>
             </div>
 
-            <div class="input-area">
-                <form id="chat-form">
-                    <input
-                        type="text"
-                        id="message-input"
-                        placeholder="Type your message..."
-                        autocomplete="off"
-                    />
-                    <button type="submit">Send</button>
-                </form>
-            </div>
+            <aside class="sidebar">
+                <div class="sidebar-section">
+                    <h3>Session Metrics</h3>
+                    <div class="metric">
+                        <span class="label">Model:</span>
+                        <span id="metric-model" class="value">-</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Prompt Tokens:</span>
+                        <span id="metric-prompt-tokens" class="value">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Completion Tokens:</span>
+                        <span id="metric-completion-tokens" class="value">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Total Tokens:</span>
+                        <span id="metric-total-tokens" class="value">0</span>
+                    </div>
+                </div>
+                <div class="sidebar-section">
+                    <h3>Context Info</h3>
+                    <p class="small">RAG context will appear here in future updates.</p>
+                </div>
+            </aside>
         </div>
 
         <script src="/static/marked.min.js"></script>
+
         <script src="/static/purify.min.js"></script>
         <script src="/static/script.js"></script>
     </body>
