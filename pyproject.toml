@@ -8,5 +8,5 @@ dependencies = [
     "flask>=3.1.2",
     "openai>=2.14.0",
     "python-dotenv>=1.2.1",
-    "requests>=2.31.0",
+    "requests>=2.32.5",
 ]
