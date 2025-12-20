@@ -1,5 +1,6 @@
 import json
 import logging
+import requests
 from openai import OpenAI
 from flask import current_app
 
@@ -62,6 +63,33 @@ class ChatService:
         except Exception as e:
             logger.error(f"Error in chat_stream: {str(e)}", exc_info=True)
             yield f"Error: {str(e)}"
+
+
+    def get_models(self):
+        """Fetch available models from OpenRouter API."""
+        logger.info("Fetching models from OpenRouter")
+
+        try:
+            url = f"{current_app.config['OPENROUTER_BASE_URL']}/models"
+            headers = {
+                "Authorization": f"Bearer {current_app.config['OPENROUTER_API_KEY']}"
+            }
+
+            response = requests.get(url, headers=headers, timeout=30)
+            response.raise_for_status()
+
+            data = response.json()
+            models = data.get("data", [])
+
+            # Sort models by name for better UX
+            models.sort(key=lambda m: m.get("name", m.get("id", "")))
+
+            logger.info(f"Successfully fetched {len(models)} models")
+            return models
+
+        except requests.RequestException as e:
+            logger.error(f"Error fetching models: {str(e)}", exc_info=True)
+            raise
 
 
 chat_service = ChatService()
