@@ -7,6 +7,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Default model - could be made selectable in UI
     const currentModel = "openai/gpt-3.5-turbo";
 
+    // Session-wide metrics
+    let sessionMetrics = {
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        total_tokens: 0
+    };
+
+    // Conversation history
+    let conversationHistory = [
+        { role: 'system', content: 'You are a helpful assistant.' }
+    ];
+
     // Configure marked for better chat-style breaks
     marked.setOptions({
         breaks: true,
@@ -24,7 +36,10 @@ document.addEventListener('DOMContentLoaded', () => {
         messageInput.disabled = true;
         submitButton.disabled = true;
 
-        // Add user message
+        // Add user message to history
+        conversationHistory.push({ role: 'user', content: message });
+
+        // Add user message UI
         appendMessage('user', message);
 
         // Add empty bot message container
@@ -38,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    message: message,
+                    messages: conversationHistory,
                     model: currentModel
                 })
             });
@@ -79,6 +94,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatHistory.scrollTop = chatHistory.scrollHeight;
             }
 
+            // Add bot message to history
+            if (messageBuffer) {
+                conversationHistory.push({ role: 'assistant', content: messageBuffer });
+            }
+
         } catch (error) {
             console.error('Error:', error);
             botMessageContent.innerHTML += ` <span style="color: red;">[Error: ${error.message}]</span>`;
@@ -90,10 +110,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function updateMetrics(data) {
+        // Update Last Interaction
         if (data.model) document.getElementById('metric-model').textContent = data.model;
         if (data.prompt_tokens) document.getElementById('metric-prompt-tokens').textContent = data.prompt_tokens;
         if (data.completion_tokens) document.getElementById('metric-completion-tokens').textContent = data.completion_tokens;
         if (data.total_tokens) document.getElementById('metric-total-tokens').textContent = data.total_tokens;
+
+        // Update Session Totals
+        if (data.prompt_tokens) sessionMetrics.prompt_tokens += data.prompt_tokens;
+        if (data.completion_tokens) sessionMetrics.completion_tokens += data.completion_tokens;
+        if (data.total_tokens) sessionMetrics.total_tokens += data.total_tokens;
+
+        document.getElementById('total-prompt-tokens').textContent = sessionMetrics.prompt_tokens;
+        document.getElementById('total-completion-tokens').textContent = sessionMetrics.completion_tokens;
+        document.getElementById('total-total-tokens').textContent = sessionMetrics.total_tokens;
     }
 
     function appendMessage(role, text) {

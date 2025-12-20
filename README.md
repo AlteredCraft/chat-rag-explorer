@@ -7,6 +7,7 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 ## 🚀 Features
 
 *   **Real-time Streaming**: Implements Server-Sent Events (SSE) logic to stream LLM responses token-by-token.
+*   **Conversation History**: Full multi-turn conversation support, allowing the LLM to remember context throughout the session.
 *   **Metrics Sidebar**: A dedicated right-hand sidebar displaying real-time session metrics, including model identification and token usage (prompt, completion, total).
 *   **Markdown Support**: Securely renders Markdown (including lists, code blocks, and formatting) using Marked.js and DOMPurify for sanitization. Works offline.
 *   **Modular Architecture**: Organized following Flask best practices (Blueprints, Application Factory pattern).

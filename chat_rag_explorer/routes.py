@@ -15,16 +15,18 @@ def index():
 @main_bp.route("/api/chat", methods=["POST"])
 def chat():
     data = request.json
-    user_message = data.get("message", "")
+    messages = data.get("messages", [])
     model = data.get("model")
 
-    logger.info(f"Received chat request. Model: {model}")
+    logger.info(
+        f"Received chat request. Context length: {len(messages)}, Model: {model}"
+    )
 
-    if not user_message:
-        logger.warning("Chat request received without message")
-        return {"error": "Message is required"}, 400
+    if not messages:
+        logger.warning("Chat request received without messages")
+        return {"error": "Messages are required"}, 400
 
     return Response(
-        stream_with_context(chat_service.chat_stream(user_message, model)),
+        stream_with_context(chat_service.chat_stream(messages, model)),
         mimetype="text/plain",
     )

@@ -19,21 +19,18 @@ class ChatService:
             )
         return self.client
 
-    def chat_stream(self, message, model=None):
+    def chat_stream(self, messages, model=None):
         client = self.get_client()
         target_model = model or current_app.config["DEFAULT_MODEL"]
 
         logger.info(f"Starting chat stream for model: {target_model}")
-        logger.debug(f"User message: {message}")
+        logger.debug(f"Conversation context: {json.dumps(messages)}")
 
         try:
             # Note: stream_options={"include_usage": True} is required for token counts in streams
             stream = client.chat.completions.create(
                 model=target_model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": message},
-                ],
+                messages=messages,
                 stream=True,
                 stream_options={"include_usage": True},
             )
