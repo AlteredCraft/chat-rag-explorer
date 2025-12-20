@@ -7,6 +7,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Default model - could be made selectable in UI
     const currentModel = "openai/gpt-3.5-turbo";
 
+    // Configure marked for better chat-style breaks
+    marked.setOptions({
+        breaks: true,
+        gfm: true
+    });
+
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -23,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add empty bot message container
         const botMessageContent = appendMessage('bot', '');
+        let messageBuffer = '';
 
         try {
             const response = await fetch('/api/chat', {
@@ -49,7 +56,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (done) break;
                 
                 const chunk = decoder.decode(value, { stream: true });
-                botMessageContent.textContent += chunk;
+                messageBuffer += chunk;
+                
+                // Parse markdown and sanitize
+                const html = marked.parse(messageBuffer);
+                botMessageContent.innerHTML = DOMPurify.sanitize(html);
                 
                 // Auto-scroll to bottom
                 chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -57,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Error:', error);
-            botMessageContent.textContent += ` [Error: ${error.message}]`;
+            botMessageContent.innerHTML += ` <span style="color: red;">[Error: ${error.message}]</span>`;
         } finally {
             messageInput.disabled = false;
             submitButton.disabled = false;
@@ -71,7 +82,14 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const contentDiv = document.createElement('div');
         contentDiv.className = 'content';
-        contentDiv.textContent = text;
+        
+        if (role === 'user') {
+            contentDiv.textContent = text;
+        } else {
+            // For bot, if there's initial text, parse it as markdown
+            const html = marked.parse(text || '');
+            contentDiv.innerHTML = DOMPurify.sanitize(html);
+        }
         
         messageDiv.appendChild(contentDiv);
         chatHistory.appendChild(messageDiv);
