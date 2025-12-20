@@ -7,6 +7,7 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 ## 🚀 Features
 
 *   **Real-time Streaming**: Implements Server-Sent Events (SSE) logic to stream LLM responses token-by-token.
+*   **Model Selection**: Settings page with a dynamic model picker that fetches all available models from OpenRouter, grouped by provider with pricing and context length details.
 *   **Conversation History**: Full multi-turn conversation support, allowing the LLM to remember context throughout the session.
 *   **Metrics Sidebar**: A dedicated right-hand sidebar displaying real-time session metrics, including model identification and token usage (prompt, completion, total).
 *   **Markdown Support**: Securely renders Markdown (including lists, code blocks, and formatting) using Marked.js and DOMPurify for sanitization. Works offline.
@@ -60,19 +61,26 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 
 ```text
 chat-rag-explorer/
-├── chat_rag_explorer/   # Main package
-│   ├── static/          # CSS, JS, and local libraries (Marked.js, DOMPurify)
-│   ├── templates/       # HTML templates
-│   ├── __init__.py      # App factory
-│   ├── logging.py       # Centralized logging configuration
-│   ├── routes.py        # Web endpoints
-│   └── services.py      # LLM integration logic
+├── chat_rag_explorer/       # Main package
+│   ├── static/              # CSS, JS, and local libraries
+│   │   ├── script.js        # Main chat interface logic
+│   │   ├── settings.js      # Settings page logic (model picker)
+│   │   ├── style.css        # Application styles
+│   │   ├── marked.min.js    # Markdown parser (offline)
+│   │   └── purify.min.js    # HTML sanitizer (offline)
+│   ├── templates/           # HTML templates
+│   │   ├── index.html       # Main chat interface
+│   │   └── settings.html    # Settings page (model selection)
+│   ├── __init__.py          # App factory
+│   ├── logging.py           # Centralized logging configuration
+│   ├── routes.py            # Web endpoints
+│   └── services.py          # LLM integration logic
 ├── docs/
-│   └── adr/             # Architecture Decision Records (ADRs)
-├── config.py            # Configuration settings (environment variable mapping)
-├── main.py              # Application entry point
-├── pyproject.toml       # Dependencies and project metadata (uv)
-└── .env                 # Secrets and local overrides (gitignored)
+│   └── adr/                 # Architecture Decision Records (ADRs)
+├── config.py                # Configuration settings (environment variable mapping)
+├── main.py                  # Application entry point
+├── pyproject.toml           # Dependencies and project metadata (uv)
+└── .env                     # Secrets and local overrides (gitignored)
 ```
 
 ## 🏗 Architectural Decisions
@@ -85,6 +93,7 @@ This project maintains Architecture Decision Records (ADRs) to document signific
 *   [x] LLM Streaming
 *   [x] Conversation History (Multi-turn)
 *   [x] Metrics Sidebar (Token usage & Model info)
+*   [x] Settings Page with Model Selection
 *   [ ] **RAG Implementation**: Connect a vector database to query local documents.
 *   [ ] File Upload Support
 *   [ ] Chat History Persistence (Server-side)

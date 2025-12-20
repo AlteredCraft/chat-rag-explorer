@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Settings - Chat RAG Explorer</title>
+        <link rel="stylesheet" href="/static/style.css" />
+    </head>
+    <body>
+        <div class="settings-layout">
+            <div class="settings-container">
+                <header>
+                    <div class="header-content">
+                        <a href="/" class="back-link">&larr; Back to Chat</a>
+                        <h1>Settings</h1>
+                    </div>
+                </header>
+
+                <div class="settings-content">
+                    <section class="settings-section">
+                        <h2>Model Selection</h2>
+                        <p class="section-description">Choose the AI model to use for chat conversations.</p>
+
+                        <div class="setting-item">
+                            <label for="model-select">Active Model</label>
+                            <div class="select-wrapper">
+                                <select id="model-select" disabled>
+                                    <option value="">Loading models...</option>
+                                </select>
+                                <span id="loading-indicator" class="loading-indicator"></span>
+                            </div>
+                            <div id="model-details" class="model-details">
+                                <!-- Model details will appear here -->
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="settings-section">
+                        <h2>Future Settings</h2>
+                        <p class="section-description">More configuration options will be available here in future updates.</p>
+                        <div class="placeholder-items">
+                            <div class="placeholder-item">System Prompt Configuration</div>
+                            <div class="placeholder-item">Temperature & Parameters</div>
+                            <div class="placeholder-item">RAG Settings</div>
+                            <div class="placeholder-item">Theme Preferences</div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <script src="/static/settings.js"></script>
+    </body>
+</html>

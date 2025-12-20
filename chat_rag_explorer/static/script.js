@@ -4,8 +4,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatHistory = document.getElementById('chat-history');
     const submitButton = chatForm.querySelector('button');
 
-    // Default model - could be made selectable in UI
-    const currentModel = "openai/gpt-3.5-turbo";
+    const STORAGE_KEY = 'chat-rag-selected-model';
+    const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
+
+    // Get model from localStorage or use default
+    function getCurrentModel() {
+        return localStorage.getItem(STORAGE_KEY) || DEFAULT_MODEL;
+    }
 
     // Session-wide metrics
     let sessionMetrics = {
@@ -54,7 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     messages: conversationHistory,
-                    model: currentModel
+                    model: getCurrentModel()
                 })
             });
 
