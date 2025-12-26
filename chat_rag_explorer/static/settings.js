@@ -1,4 +1,48 @@
+/**
+ * Frontend Logger Utility (shared with script.js pattern)
+ * Provides structured logging with session tracking for debugging
+ */
+const SettingsLogger = {
+    sessionId: localStorage.getItem('chat-rag-session-id') || (() => {
+        const id = 'sess_' + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem('chat-rag-session-id', id);
+        return id;
+    })(),
+
+    _format(level, message, data) {
+        const timestamp = new Date().toISOString();
+        const prefix = `[${timestamp}] [${this.sessionId}] ${level.toUpperCase()}:`;
+        return { prefix, message, data };
+    },
+
+    debug(message, data = null) {
+        const { prefix, message: msg, data: d } = this._format('debug', message, data);
+        if (d) console.debug(prefix, msg, d);
+        else console.debug(prefix, msg);
+    },
+
+    info(message, data = null) {
+        const { prefix, message: msg, data: d } = this._format('info', message, data);
+        if (d) console.info(prefix, msg, d);
+        else console.info(prefix, msg);
+    },
+
+    warn(message, data = null) {
+        const { prefix, message: msg, data: d } = this._format('warn', message, data);
+        if (d) console.warn(prefix, msg, d);
+        else console.warn(prefix, msg);
+    },
+
+    error(message, data = null) {
+        const { prefix, message: msg, data: d } = this._format('error', message, data);
+        if (d) console.error(prefix, msg, d);
+        else console.error(prefix, msg);
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+    SettingsLogger.info('Settings page initializing');
+
     const modelSelect = document.getElementById('model-select');
     const loadingIndicator = document.getElementById('loading-indicator');
     const modelDetails = document.getElementById('model-details');
@@ -12,22 +56,35 @@ document.addEventListener('DOMContentLoaded', () => {
     loadModels();
 
     async function loadModels() {
+        SettingsLogger.info('Loading models from API');
+        const startTime = performance.now();
         loadingIndicator.classList.add('active');
 
         try {
             const response = await fetch('/api/models');
             if (!response.ok) {
+                SettingsLogger.error('Models API returned error', { status: response.status });
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
             modelsData = data.data || [];
 
+            const elapsed = performance.now() - startTime;
+            SettingsLogger.info('Models loaded successfully', {
+                count: modelsData.length,
+                loadTime_ms: elapsed.toFixed(2)
+            });
+
             populateModelSelect(modelsData);
             restoreSelectedModel();
 
         } catch (error) {
-            console.error('Failed to load models:', error);
+            const elapsed = performance.now() - startTime;
+            SettingsLogger.error('Failed to load models', {
+                error: error.message,
+                loadTime_ms: elapsed.toFixed(2)
+            });
             modelSelect.innerHTML = '<option value="">Failed to load models</option>';
         } finally {
             loadingIndicator.classList.remove('active');
@@ -36,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function populateModelSelect(models) {
+        SettingsLogger.debug('Populating model select dropdown');
         modelSelect.innerHTML = '';
 
         // Group models by provider
@@ -66,6 +124,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             modelSelect.appendChild(optgroup);
         });
+
+        SettingsLogger.debug('Model select populated', {
+            providers: sortedProviders.length,
+            totalModels: models.length
+        });
     }
 
     function formatProviderName(provider) {
@@ -85,12 +148,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function restoreSelectedModel() {
         const savedModel = localStorage.getItem(STORAGE_KEY);
+        SettingsLogger.debug('Restoring selected model', { savedModel: savedModel || '(none)' });
+
         if (savedModel && modelSelect.querySelector(`option[value="${savedModel}"]`)) {
             modelSelect.value = savedModel;
+            SettingsLogger.info('Restored previously saved model', { model: savedModel });
         } else {
             // Try to select default model
             if (modelSelect.querySelector(`option[value="${DEFAULT_MODEL}"]`)) {
                 modelSelect.value = DEFAULT_MODEL;
+                SettingsLogger.info('Using default model (no saved selection)', { model: DEFAULT_MODEL });
+            } else {
+                SettingsLogger.warn('Default model not available in model list', { defaultModel: DEFAULT_MODEL });
             }
         }
         updateModelDetails();
@@ -137,9 +206,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     modelSelect.addEventListener('change', () => {
         const selectedModel = modelSelect.value;
+        const previousModel = localStorage.getItem(STORAGE_KEY);
+
         if (selectedModel) {
             localStorage.setItem(STORAGE_KEY, selectedModel);
+            SettingsLogger.info('Model selection changed', {
+                previousModel: previousModel || '(none)',
+                newModel: selectedModel
+            });
             updateModelDetails();
         }
     });
+
+    SettingsLogger.info('Settings page initialized successfully');
 });

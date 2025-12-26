@@ -12,7 +12,7 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 *   **Metrics Sidebar**: A dedicated right-hand sidebar displaying real-time session metrics, including model identification and token usage (prompt, completion, total).
 *   **Markdown Support**: Securely renders Markdown (including lists, code blocks, and formatting) using Marked.js and DOMPurify for sanitization. Works offline.
 *   **Modular Architecture**: Organized following Flask best practices (Blueprints, Application Factory pattern).
-*   **Centralized Logging**: Configurable logging for the app (DEBUG) and dependencies (INFO). Includes raw LLM response logging in `DEBUG` mode for inspecting provider metadata.
+*   **Centralized Logging**: Request ID correlation, performance metrics, and configurable log levels for app and dependencies. See [Logging](#-logging) section for details.
 *   **OpenRouter Integration**: Easy access to various state-of-the-art models via a single API.
 *   **Clean UI**: A responsive, modern chat interface built with raw HTML/CSS/JS (no heavy frontend frameworks).
 *   **Modern Python Tooling**: Uses `uv` for blazing fast dependency management.
@@ -86,6 +86,57 @@ chat-rag-explorer/
 ## 🏗 Architectural Decisions
 
 This project maintains Architecture Decision Records (ADRs) to document significant design choices and their rationale. You can find them in the `docs/adr/` directory. These are excellent resources for understanding *why* certain technologies or patterns were chosen.
+
+## 📋 Logging
+
+The application features a comprehensive logging system for debugging and monitoring.
+
+### Configuration
+
+Set these environment variables in your `.env` file:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_LEVEL_APP` | `DEBUG` | Log level for application code |
+| `LOG_LEVEL_DEPS` | `INFO` | Log level for dependencies (Flask, httpx, etc.) |
+| `LOG_TO_STDOUT` | `true` | Output logs to console |
+| `LOG_TO_FILE` | `true` | Write logs to file |
+| `LOG_FILE_PATH` | `app.log` | Path to log file |
+
+### Backend Logging
+
+**Startup Banner**: On application start, logs configuration summary with masked API key:
+```
+============================================================
+Chat RAG Explorer - Starting up
+============================================================
+Configuration:
+  - OpenRouter Base URL: https://openrouter.ai/api/v1
+  - OpenRouter API Key: sk-or-v1...6a0d
+  - Default Model: openai/gpt-3.5-turbo
+============================================================
+```
+
+**Request Correlation**: All API requests include a unique request ID for tracing:
+```
+[a1b2c3d4] POST /api/chat - Model: openai/gpt-4, Messages: 3, Content length: 150 chars
+[a1b2c3d4] Starting chat stream - Model: openai/gpt-4
+[a1b2c3d4] Token usage - Prompt: 45, Completion: 120, Total: 165
+[a1b2c3d4] POST /api/chat - Stream completed (1.523s, 42 chunks)
+```
+
+**Performance Metrics**: Timing information for requests, including time-to-first-chunk (TTFC) for streams.
+
+### Frontend Logging
+
+The browser console includes structured logs with session tracking:
+```
+[2025-12-26T15:30:00.000Z] [sess_abc123] INFO: Chat request initiated {model: "openai/gpt-4", messageLength: 50}
+[2025-12-26T15:30:01.500Z] [sess_abc123] DEBUG: Time to first chunk {ttfc_ms: "823.45"}
+[2025-12-26T15:30:02.000Z] [sess_abc123] INFO: Chat response completed {chunks: 42, totalTime_ms: "1523.00"}
+```
+
+Open browser DevTools (F12) → Console to view frontend logs.
 
 ## 📚 Roadmap
 

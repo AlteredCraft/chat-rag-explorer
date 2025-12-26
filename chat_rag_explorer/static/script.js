@@ -1,4 +1,48 @@
+/**
+ * Frontend Logger Utility
+ * Provides structured logging with session tracking for debugging
+ */
+const AppLogger = {
+    sessionId: localStorage.getItem('chat-rag-session-id') || (() => {
+        const id = 'sess_' + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem('chat-rag-session-id', id);
+        return id;
+    })(),
+
+    _format(level, message, data) {
+        const timestamp = new Date().toISOString();
+        const prefix = `[${timestamp}] [${this.sessionId}] ${level.toUpperCase()}:`;
+        return { prefix, message, data };
+    },
+
+    debug(message, data = null) {
+        const { prefix, message: msg, data: d } = this._format('debug', message, data);
+        if (d) console.debug(prefix, msg, d);
+        else console.debug(prefix, msg);
+    },
+
+    info(message, data = null) {
+        const { prefix, message: msg, data: d } = this._format('info', message, data);
+        if (d) console.info(prefix, msg, d);
+        else console.info(prefix, msg);
+    },
+
+    warn(message, data = null) {
+        const { prefix, message: msg, data: d } = this._format('warn', message, data);
+        if (d) console.warn(prefix, msg, d);
+        else console.warn(prefix, msg);
+    },
+
+    error(message, data = null) {
+        const { prefix, message: msg, data: d } = this._format('error', message, data);
+        if (d) console.error(prefix, msg, d);
+        else console.error(prefix, msg);
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
+    AppLogger.info('Chat application initializing');
+
     const chatForm = document.getElementById('chat-form');
     const messageInput = document.getElementById('message-input');
     const chatHistory = document.getElementById('chat-history');
@@ -35,11 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Get model from localStorage or use default
     function getCurrentModel() {
-        return localStorage.getItem(STORAGE_KEY) || DEFAULT_MODEL;
+        const model = localStorage.getItem(STORAGE_KEY) || DEFAULT_MODEL;
+        return model;
     }
 
     // Display current model on load
-    document.getElementById('metric-model').textContent = getCurrentModel();
+    const currentModel = getCurrentModel();
+    document.getElementById('metric-model').textContent = currentModel;
+    AppLogger.info('Current model loaded', { model: currentModel });
 
     // Session-wide metrics
     let sessionMetrics = {
@@ -61,9 +108,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const message = messageInput.value.trim();
         if (!message) return;
+
+        const model = getCurrentModel();
+        const requestStartTime = performance.now();
+
+        AppLogger.info('Chat request initiated', {
+            model: model,
+            messageLength: message.length,
+            conversationTurns: conversationHistory.length
+        });
 
         // Clear input
         messageInput.value = '';
@@ -79,8 +135,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Add empty bot message container
         const botMessageContent = appendMessage('bot', '');
         let messageBuffer = '';
+        let chunkCount = 0;
+        let firstChunkTime = null;
 
         try {
+            AppLogger.debug('Sending POST /api/chat', {
+                contextLength: conversationHistory.length,
+                model: model
+            });
+
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
@@ -88,13 +151,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 body: JSON.stringify({
                     messages: conversationHistory,
-                    model: getCurrentModel()
+                    model: model
                 })
             });
 
             if (!response.ok) {
+                AppLogger.error('Chat API returned error', { status: response.status });
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
+
+            AppLogger.debug('Stream started, processing chunks');
 
             // Handle streaming response
             const reader = response.body.getReader();
@@ -103,30 +169,46 @@ document.addEventListener('DOMContentLoaded', () => {
             while (true) {
                 const { value, done } = await reader.read();
                 if (done) break;
-                
+
                 const chunk = decoder.decode(value, { stream: true });
-                
+                chunkCount++;
+
+                // Track time to first chunk
+                if (firstChunkTime === null && chunk.length > 0) {
+                    firstChunkTime = performance.now();
+                    const ttfc = firstChunkTime - requestStartTime;
+                    AppLogger.debug('Time to first chunk', { ttfc_ms: ttfc.toFixed(2) });
+                }
+
                 // Check for metadata marker
                 if (chunk.startsWith('__METADATA__:')) {
                     try {
                         const metadataJson = chunk.replace('__METADATA__:', '');
                         const usageData = JSON.parse(metadataJson);
+                        AppLogger.info('Token usage received', usageData);
                         updateMetrics(usageData);
-                    } catch (e) {
-                        console.error('Failed to parse metadata', e);
+                    } catch (parseError) {
+                        AppLogger.error('Failed to parse metadata', { error: parseError.message, chunk: chunk });
                     }
                     continue; // Don't render metadata in chat
                 }
 
                 messageBuffer += chunk;
-                
+
                 // Parse markdown and sanitize
                 const html = marked.parse(messageBuffer);
                 botMessageContent.innerHTML = DOMPurify.sanitize(html);
-                
+
                 // Auto-scroll to bottom
                 chatHistory.scrollTop = chatHistory.scrollHeight;
             }
+
+            const totalTime = performance.now() - requestStartTime;
+            AppLogger.info('Chat response completed', {
+                chunks: chunkCount,
+                responseLength: messageBuffer.length,
+                totalTime_ms: totalTime.toFixed(2)
+            });
 
             // Add bot message to history
             if (messageBuffer) {
@@ -134,7 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
         } catch (error) {
-            console.error('Error:', error);
+            const totalTime = performance.now() - requestStartTime;
+            AppLogger.error('Chat request failed', {
+                error: error.message,
+                totalTime_ms: totalTime.toFixed(2),
+                chunksReceived: chunkCount
+            });
             botMessageContent.innerHTML += ` <span style="color: red;">[Error: ${error.message}]</span>`;
         } finally {
             messageInput.disabled = false;
@@ -144,6 +231,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function updateMetrics(data) {
+        AppLogger.debug('Updating metrics display', data);
+
         // Update Last Interaction
         if (data.model) document.getElementById('metric-model').textContent = data.model;
         if (data.prompt_tokens) document.getElementById('metric-prompt-tokens').textContent = data.prompt_tokens;
@@ -158,6 +247,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('total-prompt-tokens').textContent = sessionMetrics.prompt_tokens;
         document.getElementById('total-completion-tokens').textContent = sessionMetrics.completion_tokens;
         document.getElementById('total-total-tokens').textContent = sessionMetrics.total_tokens;
+
+        AppLogger.info('Session metrics updated', {
+            sessionTotals: { ...sessionMetrics }
+        });
     }
 
     function appendMessage(role, text) {
@@ -183,4 +276,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return contentDiv; // Return content div so we can append to it
     }
+
+    AppLogger.info('Chat application initialized successfully', {
+        sessionId: AppLogger.sessionId,
+        model: getCurrentModel()
+    });
 });
