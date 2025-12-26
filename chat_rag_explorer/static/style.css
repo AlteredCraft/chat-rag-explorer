@@ -261,9 +261,11 @@ button:disabled {
 .settings-layout {
     display: flex;
     justify-content: center;
-    min-height: 100vh;
+    height: 100vh;
     padding: 2rem;
     background-color: var(--bg-color);
+    overflow-y: auto;
+    box-sizing: border-box;
 }
 
 .settings-container {
@@ -272,7 +274,7 @@ button:disabled {
     background-color: var(--chat-bg);
     border-radius: 0.5rem;
     box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    overflow: hidden;
+    height: fit-content;
 }
 
 .settings-container header {
@@ -397,6 +399,30 @@ button:disabled {
     font-weight: 500;
     color: #333;
     font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.model-details .description {
+    margin-bottom: 1rem;
+    color: #555;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-style: italic;
+}
+
+.model-details .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.model-details .tag {
+    background: #e8e8e8;
+    color: #444;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: monospace;
 }
 
 .placeholder-items {

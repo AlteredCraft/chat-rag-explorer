@@ -183,7 +183,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const promptPrice = pricing.prompt ? `$${(parseFloat(pricing.prompt) * 1000000).toFixed(2)}/M tokens` : 'N/A';
         const completionPrice = pricing.completion ? `$${(parseFloat(pricing.completion) * 1000000).toFixed(2)}/M tokens` : 'N/A';
 
+        const description = model.description || '';
+        const architecture = model.architecture || {};
+        const inputModalities = architecture.input_modalities || [];
+        const outputModalities = architecture.output_modalities || [];
+        const supportedParams = model.supported_parameters || [];
+
         modelDetails.innerHTML = `
+            ${description ? `<div class="detail-row description"><span class="detail-value">${description}</span></div>` : ''}
             <div class="detail-row">
                 <span class="detail-label">Model ID:</span>
                 <span class="detail-value">${model.id}</span>
@@ -200,6 +207,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span class="detail-label">Completion Pricing:</span>
                 <span class="detail-value">${completionPrice}</span>
             </div>
+            ${inputModalities.length ? `<div class="detail-row"><span class="detail-label">Modality-in:</span><div class="tags">${inputModalities.map(m => `<span class="tag">${m}</span>`).join('')}</div></div>` : ''}
+            ${outputModalities.length ? `<div class="detail-row"><span class="detail-label">Modality-out:</span><div class="tags">${outputModalities.map(m => `<span class="tag">${m}</span>`).join('')}</div></div>` : ''}
+            ${supportedParams.length ? `<div class="detail-row"><span class="detail-label">Parameters:</span><div class="tags">${supportedParams.map(p => `<span class="tag">${p}</span>`).join('')}</div></div>` : ''}
         `;
         modelDetails.classList.add('visible');
     }

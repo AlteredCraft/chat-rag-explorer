@@ -62,6 +62,7 @@ class ChatService:
 
             chunk_count = 0
             total_content_length = 0
+            full_response = []  # Accumulate response for debug logging
 
             for chunk in stream:
                 # Track time to first chunk (TTFC)
@@ -90,6 +91,7 @@ class ChatService:
                     if content is not None:
                         chunk_count += 1
                         total_content_length += len(content)
+                        full_response.append(content)
                         yield content
 
                 # Log progress every 50 chunks (reduced verbosity)
@@ -101,6 +103,7 @@ class ChatService:
                 f"[{req_id}] Stream completed - {chunk_count} chunks, "
                 f"{total_content_length} chars, {elapsed:.3f}s total"
             )
+            logger.debug(f"[{req_id}] LLM response:\n{''.join(full_response)}")
 
         except Exception as e:
             elapsed = time.time() - stream_start_time
