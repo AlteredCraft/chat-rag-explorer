@@ -34,13 +34,13 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 2.  **Set up the environment variables**
     Create a `.env` file in the root directory:
     ```bash
-    cp .env.example .env  # If example exists, otherwise create manually
+    cp .env.example .env
     ```
     Add your API key and optional configuration to `.env`:
     ```env
     OPENROUTER_API_KEY=sk-or-v1-your-key-here
     
-    # Optional Logging Configuration
+    # Logging Configuration
     LOG_LEVEL_APP=DEBUG
     LOG_LEVEL_DEPS=INFO
     LOG_TO_STDOUT=true
@@ -53,6 +53,8 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
     ```bash
     uv run main.py
     ```
+
+    > **Port in use?** If port 5005 is taken, edit the `port` variable in `main.py`.
 
 4.  **Explore**
     Open your browser to [http://127.0.0.1:5005](http://127.0.0.1:5005).
