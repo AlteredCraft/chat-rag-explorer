@@ -95,7 +95,7 @@ This project maintains Architecture Decision Records (ADRs) to document signific
 *   [x] Metrics Sidebar (Token usage & Model info)
 *   [x] Settings Page with Model Selection
 *   [ ] **RAG Implementation**: Connect a vector database to query local documents.
-*   [ ] File Upload Support
+*   [ ] Further settings and metrics for Chat UI
 *   [ ] Chat History Persistence (Server-side)
 
 ## 📝 License
