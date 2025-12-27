@@ -17,4 +17,8 @@ class Config:
     LOG_LEVEL_DEPS = os.getenv("LOG_LEVEL_DEPS", "INFO")
     LOG_TO_STDOUT = os.getenv("LOG_TO_STDOUT", "true").lower() == "true"
     LOG_TO_FILE = os.getenv("LOG_TO_FILE", "true").lower() == "true"
-    LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "app.log")
+    LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "logs/app.log")
+
+    # Chat History Configuration
+    CHAT_HISTORY_ENABLED = os.getenv("CHAT_HISTORY_ENABLED", "true").lower() == "true"
+    CHAT_HISTORY_PATH = os.getenv("CHAT_HISTORY_PATH", "logs/chat-history.jsonl")

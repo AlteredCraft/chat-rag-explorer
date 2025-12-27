@@ -1,5 +1,6 @@
 import logging
 import sys
+from pathlib import Path
 from flask import Flask
 
 
@@ -19,7 +20,9 @@ def setup_logging(app: Flask):
 
     # 2. File Handler
     if app.config.get("LOG_TO_FILE"):
-        file_path = app.config.get("LOG_FILE_PATH", "app.log")
+        file_path = app.config.get("LOG_FILE_PATH", "logs/app.log")
+        # Ensure the logs directory exists
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
         file_handler = logging.FileHandler(file_path)
         file_handler.setFormatter(formatter)
         handlers.append(file_handler)

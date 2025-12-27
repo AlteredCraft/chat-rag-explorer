@@ -1,10 +1,12 @@
+import json
 import logging
 import time
 import uuid
-from flask import Blueprint, render_template, request, Response, stream_with_context, jsonify
+from flask import Blueprint, current_app, render_template, request, Response, stream_with_context, jsonify
 from chat_rag_explorer.services import chat_service
 from chat_rag_explorer.prompt_service import prompt_service
 from chat_rag_explorer.rag_config_service import rag_config_service
+from chat_rag_explorer.chat_history_service import chat_history_service
 
 main_bp = Blueprint("main", __name__)
 logger = logging.getLogger(__name__)
@@ -189,7 +191,9 @@ def delete_prompt(prompt_id):
 
 @main_bp.route("/api/chat", methods=["POST"])
 def chat():
-    request_id = generate_request_id()
+    # Generate full UUID for chat history, short version for app logs
+    full_request_id = str(uuid.uuid4())
+    request_id = full_request_id[:8]
     start_time = time.time()
 
     data = request.json
@@ -216,17 +220,91 @@ def chat():
         logger.warning(f"[{request_id}] POST /api/chat - No model specified, will use default")
 
     def stream_with_logging():
-        """Wrapper to add logging around the stream."""
+        """Wrapper to add logging and chat history around the stream."""
+        accumulated_content = []
+        chunk_count = 0
+        ttfc_time = None
+        token_usage = None
+        error_message = None
+        status = "success"
+        resolved_model = model
+
         try:
-            chunk_count = 0
             for chunk in chat_service.chat_stream(messages, model, temperature, top_p, request_id):
+                # Track time to first content chunk
+                if ttfc_time is None and not chunk.startswith("__METADATA__") and not chunk.startswith("Error:"):
+                    ttfc_time = time.time()
+
+                # Extract metadata (token usage) - don't yield to client
+                if chunk.startswith("__METADATA__:"):
+                    metadata_json = chunk[len("__METADATA__:"):]
+                    try:
+                        metadata = json.loads(metadata_json)
+                        token_usage = {
+                            "prompt_tokens": metadata.get("prompt_tokens"),
+                            "completion_tokens": metadata.get("completion_tokens"),
+                            "total_tokens": metadata.get("total_tokens"),
+                        }
+                        # Update model if returned in metadata
+                        if metadata.get("model"):
+                            resolved_model = metadata.get("model")
+                    except json.JSONDecodeError:
+                        pass
+                    continue  # Don't yield metadata to client
+
+                # Track errors
+                if chunk.startswith("Error:"):
+                    status = "error"
+                    error_message = chunk
+                else:
+                    accumulated_content.append(chunk)
+
                 chunk_count += 1
                 yield chunk
+
             elapsed = time.time() - start_time
+            ttfc_seconds = (ttfc_time - start_time) if ttfc_time else None
+
             logger.info(f"[{request_id}] POST /api/chat - Stream completed ({elapsed:.3f}s, {chunk_count} chunks)")
+
+            # Log to chat history
+            final_model = resolved_model or current_app.config.get("DEFAULT_MODEL", "unknown")
+            chat_history_service.log_interaction(
+                request_id=full_request_id,
+                messages=messages,
+                model=final_model,
+                temperature=temperature,
+                top_p=top_p,
+                response_content="".join(accumulated_content),
+                status=status,
+                error=error_message,
+                total_seconds=elapsed,
+                ttfc_seconds=ttfc_seconds,
+                chunk_count=chunk_count,
+                tokens=token_usage,
+            )
+
         except Exception as e:
             elapsed = time.time() - start_time
+            ttfc_seconds = (ttfc_time - start_time) if ttfc_time else None
             logger.error(f"[{request_id}] POST /api/chat - Stream error after {elapsed:.3f}s: {str(e)}", exc_info=True)
+
+            # Log failed interaction to chat history
+            final_model = resolved_model or model or current_app.config.get("DEFAULT_MODEL", "unknown")
+            chat_history_service.log_interaction(
+                request_id=full_request_id,
+                messages=messages,
+                model=final_model,
+                temperature=temperature,
+                top_p=top_p,
+                response_content="".join(accumulated_content),
+                status="error",
+                error=str(e),
+                total_seconds=elapsed,
+                ttfc_seconds=ttfc_seconds,
+                chunk_count=chunk_count,
+                tokens=token_usage,
+            )
             raise
 
     return Response(

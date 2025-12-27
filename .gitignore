@@ -215,3 +215,7 @@ prompts/*
 # RAG config (user-specific)
 rag_config.json
 
+# Logs directory
+logs/*
+!logs/.gitkeep
+
