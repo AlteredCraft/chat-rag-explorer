@@ -267,15 +267,37 @@ def chat():
 
             logger.info(f"[{request_id}] POST /api/chat - Stream completed ({elapsed:.3f}s, {chunk_count} chunks)")
 
-            # Log to chat history
+            # Build the entry data (used for both logging and client metadata)
             final_model = resolved_model or current_app.config.get("DEFAULT_MODEL", "unknown")
+            response_content = "".join(accumulated_content)
+
+            entry_data = {
+                "request_id": full_request_id,
+                "model": final_model,
+                "params": {
+                    "temperature": temperature,
+                    "top_p": top_p,
+                },
+                "messages": messages,
+                "response": response_content,
+                "status": status,
+                "error": error_message,
+                "tokens": token_usage,
+                "timing": {
+                    "total_ms": round(elapsed * 1000, 2),
+                    "ttfc_ms": round(ttfc_seconds * 1000, 2) if ttfc_seconds else None,
+                },
+                "chunks": chunk_count,
+            }
+
+            # Log to chat history
             chat_history_service.log_interaction(
                 request_id=full_request_id,
                 messages=messages,
                 model=final_model,
                 temperature=temperature,
                 top_p=top_p,
-                response_content="".join(accumulated_content),
+                response_content=response_content,
                 status=status,
                 error=error_message,
                 total_seconds=elapsed,
@@ -284,20 +306,45 @@ def chat():
                 tokens=token_usage,
             )
 
+            # Send metadata to client for details modal
+            yield f"__METADATA__:{json.dumps(entry_data)}"
+
         except Exception as e:
             elapsed = time.time() - start_time
             ttfc_seconds = (ttfc_time - start_time) if ttfc_time else None
             logger.error(f"[{request_id}] POST /api/chat - Stream error after {elapsed:.3f}s: {str(e)}", exc_info=True)
 
-            # Log failed interaction to chat history
+            # Build the entry data for error case
             final_model = resolved_model or model or current_app.config.get("DEFAULT_MODEL", "unknown")
+            response_content = "".join(accumulated_content)
+
+            entry_data = {
+                "request_id": full_request_id,
+                "model": final_model,
+                "params": {
+                    "temperature": temperature,
+                    "top_p": top_p,
+                },
+                "messages": messages,
+                "response": response_content,
+                "status": "error",
+                "error": str(e),
+                "tokens": token_usage,
+                "timing": {
+                    "total_ms": round(elapsed * 1000, 2),
+                    "ttfc_ms": round(ttfc_seconds * 1000, 2) if ttfc_seconds else None,
+                },
+                "chunks": chunk_count,
+            }
+
+            # Log failed interaction to chat history
             chat_history_service.log_interaction(
                 request_id=full_request_id,
                 messages=messages,
                 model=final_model,
                 temperature=temperature,
                 top_p=top_p,
-                response_content="".join(accumulated_content),
+                response_content=response_content,
                 status="error",
                 error=str(e),
                 total_seconds=elapsed,

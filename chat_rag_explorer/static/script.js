@@ -356,24 +356,13 @@ document.addEventListener('DOMContentLoaded', () => {
         messageInput.disabled = true;
         submitButton.disabled = true;
 
-        // Capture prompt context BEFORE adding user message (for metadata)
-        // We'll add the user message to this copy to get the full context sent to LLM
-        const promptContext = JSON.parse(JSON.stringify(conversationHistory));
-
         // Add user message to history
         conversationHistory.push({ role: 'user', content: message });
-        promptContext.push({ role: 'user', content: message }); // Add to context copy too
         saveConversationToSession();
 
         // Track message indices
         const userMsgIndex = messageIndex++;
         const assistantMsgIndex = messageIndex++;
-
-        // Save user message metadata (minimal - just timestamp and type)
-        saveMessageMetadata(userMsgIndex, {
-            type: 'user',
-            timestamp: new Date().toISOString()
-        });
 
         // Add user message UI
         appendMessage('user', message, userMsgIndex);
@@ -383,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let messageBuffer = '';
         let chunkCount = 0;
         let firstChunkTime = null;
-        let receivedTokens = null; // Store tokens when metadata arrives
+        let receivedMetadata = null; // Store full metadata from backend
 
         try {
             // Build request body with optional parameters
@@ -440,19 +429,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     AppLogger.debug('Time to first chunk', { ttfc_ms: ttfc.toFixed(2) });
                 }
 
-                // Check for metadata marker
+                // Check for metadata marker (full entry from backend)
                 if (chunk.startsWith('__METADATA__:')) {
                     try {
                         const metadataJson = chunk.replace('__METADATA__:', '');
-                        const usageData = JSON.parse(metadataJson);
-                        AppLogger.info('Token usage received', usageData);
-                        updateMetrics(usageData);
-                        // Store tokens for assistant metadata
-                        receivedTokens = {
-                            prompt: usageData.prompt_tokens,
-                            completion: usageData.completion_tokens,
-                            total: usageData.total_tokens
-                        };
+                        receivedMetadata = JSON.parse(metadataJson);
+                        AppLogger.info('Metadata received from backend', receivedMetadata);
+
+                        // Update metrics display
+                        if (receivedMetadata.tokens) {
+                            updateMetrics({
+                                model: receivedMetadata.model,
+                                prompt_tokens: receivedMetadata.tokens.prompt_tokens,
+                                completion_tokens: receivedMetadata.tokens.completion_tokens,
+                                total_tokens: receivedMetadata.tokens.total_tokens
+                            });
+                        }
                     } catch (parseError) {
                         AppLogger.error('Failed to parse metadata', { error: parseError.message, chunk: chunk });
                     }
@@ -481,24 +473,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 conversationHistory.push({ role: 'assistant', content: messageBuffer });
                 saveConversationToSession();
 
-                // Save assistant message metadata with full context
-                saveMessageMetadata(assistantMsgIndex, {
-                    type: 'assistant',
-                    timestamp: new Date().toISOString(),
-                    model: model,
-                    params: {
-                        temperature: requestBody.temperature,
-                        top_p: requestBody.top_p
-                    },
-                    promptContext: promptContext,
-                    tokens: receivedTokens,
-                    timing: {
-                        total_ms: totalTime,
-                        ttfc_ms: firstChunkTime ? (firstChunkTime - requestStartTime) : null
-                    },
-                    chunks: chunkCount,
-                    response: messageBuffer
-                });
+                // Save assistant metadata (received from backend - DRY with chat-history.jsonl)
+                if (receivedMetadata) {
+                    saveMessageMetadata(assistantMsgIndex, receivedMetadata);
+                }
             }
 
         } catch (error) {
@@ -625,7 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (metadata.tokens) {
-            html += `<div class="details-meta-item"><span class="details-meta-label">Tokens:</span><span class="details-meta-value">${metadata.tokens.prompt || 0} → ${metadata.tokens.completion || 0} (${metadata.tokens.total || 0})</span></div>`;
+            html += `<div class="details-meta-item"><span class="details-meta-label">Tokens:</span><span class="details-meta-value">${metadata.tokens.prompt_tokens || 0} → ${metadata.tokens.completion_tokens || 0} (${metadata.tokens.total_tokens || 0})</span></div>`;
         }
 
         if (metadata.timing) {
@@ -635,19 +613,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         html += '</div>';
 
-        // Prompt section
-        if (metadata.promptContext && metadata.promptContext.length > 0) {
-            const msgCount = metadata.promptContext.length;
+        // Prompt section (messages array from backend)
+        if (metadata.messages && metadata.messages.length > 0) {
+            const msgCount = metadata.messages.length;
             html += '<div class="details-section">';
             html += `<div class="details-section-header">Prompt sent to LLM <span class="msg-count">(${msgCount} messages)</span></div>`;
 
             // Find system message, previous context, and current user message
-            const systemMsg = metadata.promptContext.find(m => m.role === 'system');
-            const previousContext = metadata.promptContext.filter((m, i) =>
-                m.role !== 'system' && i < metadata.promptContext.length - 1
+            const systemMsg = metadata.messages.find(m => m.role === 'system');
+            const previousContext = metadata.messages.filter((m, i) =>
+                m.role !== 'system' && i < metadata.messages.length - 1
             );
-            const currentUserMsg = metadata.promptContext.length > 1 ?
-                metadata.promptContext[metadata.promptContext.length - 1] : null;
+            const currentUserMsg = metadata.messages.length > 1 ?
+                metadata.messages[metadata.messages.length - 1] : null;
 
             // System message (always expanded)
             if (systemMsg) {
