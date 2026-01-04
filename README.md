@@ -108,7 +108,7 @@ Set these environment variables in your `.env` file:
 | `LOG_TO_STDOUT` | `true` | Output logs to console |
 | `LOG_TO_FILE` | `true` | Write logs to file |
 | `LOG_FILE_PATH` | `logs/app.log` | Path to log file |
-| `CHAT_HISTORY_ENABLED` | `true` | Enable chat interaction logging |
+| `CHAT_HISTORY_ENABLED` | `false` | Enable chat interaction logging |
 | `CHAT_HISTORY_PATH` | `logs/chat-history.jsonl` | Path to chat history file |
 
 ### Backend Logging
