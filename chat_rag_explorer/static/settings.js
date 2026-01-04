@@ -733,9 +733,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += '</div>';
                 ragTestResult.innerHTML = html;
 
-                // Populate and show collection selector
+                // Populate and show collection selector (don't restore previous selection)
                 availableCollections = data.collections || [];
-                populateCollectionSelect(availableCollections);
+                populateCollectionSelect(availableCollections, false);
                 ragCollectionSection.style.display = 'block';
             } else {
                 ragTestResult.innerHTML = `
@@ -758,7 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function populateCollectionSelect(collections) {
+    function populateCollectionSelect(collections, restoreSelection = true) {
         ragCollectionSelect.innerHTML = '<option value="">Select a collection...</option>';
 
         collections.forEach(name => {
@@ -768,13 +768,15 @@ document.addEventListener('DOMContentLoaded', () => {
             ragCollectionSelect.appendChild(option);
         });
 
-        // Restore previously selected collection if available
-        const savedCollection = originalRagConfig?.collection;
-        if (savedCollection && collections.includes(savedCollection)) {
-            ragCollectionSelect.value = savedCollection;
+        // Restore previously selected collection if available (unless explicitly disabled)
+        if (restoreSelection) {
+            const savedCollection = originalRagConfig?.collection;
+            if (savedCollection && collections.includes(savedCollection)) {
+                ragCollectionSelect.value = savedCollection;
+            }
         }
 
-        SettingsLogger.debug('Collection select populated', { count: collections.length });
+        SettingsLogger.debug('Collection select populated', { count: collections.length, restoreSelection });
     }
 
     function getCurrentRagConfig() {
