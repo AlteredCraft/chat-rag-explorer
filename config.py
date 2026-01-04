@@ -33,7 +33,7 @@ class Config:
     LOG_FILE_PATH = os.getenv("LOG_FILE_PATH", "logs/app.log")
 
     # Chat History Configuration
-    CHAT_HISTORY_ENABLED = os.getenv("CHAT_HISTORY_ENABLED", "true").lower() == "true"
+    CHAT_HISTORY_ENABLED = os.getenv("CHAT_HISTORY_ENABLED", "false").lower() == "true"
     CHAT_HISTORY_PATH = os.getenv("CHAT_HISTORY_PATH", "logs/chat-history.jsonl")
 
     # Server Configuration
