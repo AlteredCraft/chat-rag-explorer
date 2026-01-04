@@ -1,4 +1,16 @@
+"""
+Logging configuration for the application.
+
+Sets up a two-tier logging system:
+- App logger (chat_rag_explorer): Detailed DEBUG-level logging for our code
+- Root logger: INFO-level logging for third-party dependencies (Flask, requests, etc.)
+
+Supports multiple output targets:
+- stdout: For development and container environments
+- File: For persistent logs with automatic directory creation
+"""
 import logging
+import os
 import sys
 from pathlib import Path
 from flask import Flask
@@ -44,8 +56,8 @@ def setup_logging(app: Flask):
     app_level = getattr(logging, app.config.get("LOG_LEVEL_APP", "DEBUG").upper())
     app_logger.setLevel(app_level)
 
-    # Ensure app logger propagates to root handlers (it does by default)
-    # But we can also set it explicitly if needed.
-    app_logger.debug(
-        f"Logging initialized. App level: {app.config.get('LOG_LEVEL_APP')}, Deps level: {app.config.get('LOG_LEVEL_DEPS')}"
-    )
+    # Log only in main process, not reloader child
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        app_logger.debug(
+            f"Logging initialized. App level: {app.config.get('LOG_LEVEL_APP')}, Deps level: {app.config.get('LOG_LEVEL_DEPS')}"
+        )

@@ -1,3 +1,15 @@
+"""
+System prompt management service.
+
+Loads and manages system prompts from markdown files in the prompts/ directory.
+Each prompt file uses YAML frontmatter for metadata (title, description) and
+markdown body for the actual prompt content.
+
+Features:
+- File-based storage with mtime caching for hot-reload
+- Protected default prompt that cannot be edited/deleted
+- CRUD operations for custom prompts
+"""
 import os
 import re
 import logging

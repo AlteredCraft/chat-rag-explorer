@@ -1188,3 +1188,126 @@ button:disabled {
 .message.user .message-details-link:hover {
     color: #fff;
 }
+
+/* ===== Sample Records ===== */
+
+.collection-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.collection-row .select-wrapper {
+    flex: 1;
+}
+
+.sample-records-section {
+    margin-top: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    background: #fafafa;
+}
+
+.sample-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background: #f5f5f5;
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.sample-title {
+    font-weight: 600;
+    color: #333;
+}
+
+.sample-count {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.sample-records-container {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.sample-record {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sample-record:last-child {
+    border-bottom: none;
+}
+
+.sample-record-id {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 0.5rem;
+    word-break: break-all;
+}
+
+.sample-record-document {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #333;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.doc-toggle {
+    display: inline;
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 0;
+    margin-left: 0.25rem;
+}
+
+.doc-toggle:hover {
+    text-decoration: underline;
+}
+
+.sample-record-metadata {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.sample-record-metadata summary {
+    cursor: pointer;
+    color: #666;
+    user-select: none;
+}
+
+.sample-record-metadata summary:hover {
+    color: var(--primary-color);
+}
+
+.sample-record-metadata pre {
+    margin: 0.5rem 0 0 0;
+    padding: 0.5rem;
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.sample-empty,
+.sample-error {
+    padding: 1rem;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+}
+
+.sample-error {
+    color: #dc3545;
+}

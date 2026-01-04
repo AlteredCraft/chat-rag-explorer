@@ -1,3 +1,16 @@
+"""
+Application configuration loaded from environment variables.
+
+All settings can be customized via a .env file in the project root.
+See .env.example for available options and their defaults.
+
+Configuration Groups:
+- OpenRouter API: LLM provider settings
+- ChromaDB: Vector database connection (local/server/cloud modes)
+- Logging: Log levels, outputs, and file paths
+- Chat History: Conversation logging settings
+- Server: Host, port, and retry behavior
+"""
 import os
 from dotenv import load_dotenv
 
@@ -22,3 +35,8 @@ class Config:
     # Chat History Configuration
     CHAT_HISTORY_ENABLED = os.getenv("CHAT_HISTORY_ENABLED", "true").lower() == "true"
     CHAT_HISTORY_PATH = os.getenv("CHAT_HISTORY_PATH", "logs/chat-history.jsonl")
+
+    # Server Configuration
+    SERVER_HOST = os.getenv("SERVER_HOST", "127.0.0.1")
+    SERVER_PORT = int(os.getenv("SERVER_PORT", "8000"))
+    SERVER_PORT_RETRIES = int(os.getenv("SERVER_PORT_RETRIES", "5"))

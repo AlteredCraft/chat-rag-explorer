@@ -593,6 +593,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const ragTestResult = document.getElementById('rag-test-result');
     const ragCollectionSection = document.getElementById('rag-collection-section');
     const ragCollectionSelect = document.getElementById('rag-collection-select');
+    const ragSampleBtn = document.getElementById('rag-sample-btn');
+    const ragSampleSection = document.getElementById('rag-sample-section');
+    const ragSampleCount = document.getElementById('rag-sample-count');
+    const ragSampleRecords = document.getElementById('rag-sample-records');
 
     let originalRagConfig = null;
     let pathValidateTimeout = null;
@@ -848,6 +852,116 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // ===== Sample Records Functions =====
+
+    function updateSampleButtonVisibility() {
+        const hasCollection = ragCollectionSelect.value !== '';
+        ragSampleBtn.style.display = hasCollection ? 'inline-block' : 'none';
+        // Hide sample section when collection changes
+        if (!hasCollection) {
+            ragSampleSection.style.display = 'none';
+        }
+    }
+
+    async function fetchSampleRecords() {
+        const collection = ragCollectionSelect.value;
+        if (!collection) return;
+
+        ragSampleBtn.disabled = true;
+        ragSampleBtn.textContent = 'Loading...';
+
+        const config = getCurrentRagConfig();
+
+        try {
+            const response = await fetch('/api/rag/sample', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...config,
+                    collection: collection
+                })
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.message || 'Failed to fetch samples');
+            }
+
+            renderSampleRecords(result.records);
+            ragSampleCount.textContent = `(${result.count})`;
+            ragSampleSection.style.display = 'block';
+
+            SettingsLogger.info('Sample records fetched', { collection, count: result.count });
+        } catch (error) {
+            SettingsLogger.error('Failed to fetch sample records', { error: error.message });
+            ragSampleRecords.innerHTML = `<div class="sample-error">Error: ${error.message}</div>`;
+            ragSampleCount.textContent = '';
+            ragSampleSection.style.display = 'block';
+        } finally {
+            ragSampleBtn.disabled = false;
+            ragSampleBtn.textContent = 'Sample';
+        }
+    }
+
+    function renderSampleRecords(records) {
+        if (!records || records.length === 0) {
+            ragSampleRecords.innerHTML = '<div class="sample-empty">No records found in this collection.</div>';
+            return;
+        }
+
+        const TRUNCATE_LENGTH = 200;
+
+        const html = records.map((record, index) => {
+            const doc = record.document || '(no document content)';
+            const needsTruncation = doc.length > TRUNCATE_LENGTH;
+            const truncatedDoc = needsTruncation ? doc.substring(0, TRUNCATE_LENGTH) + '...' : doc;
+            const metadata = record.metadata ? JSON.stringify(record.metadata, null, 2) : null;
+
+            return `
+                <div class="sample-record" data-index="${index}">
+                    <div class="sample-record-id">${escapeHtml(record.id)}</div>
+                    <div class="sample-record-document">
+                        <span class="doc-truncated">${escapeHtml(truncatedDoc)}</span>
+                        ${needsTruncation ? `<span class="doc-full" style="display: none;">${escapeHtml(doc)}</span>` : ''}
+                        ${needsTruncation ? `<button class="doc-toggle" onclick="toggleRecordExpand(this)">[show more]</button>` : ''}
+                    </div>
+                    ${metadata ? `
+                        <details class="sample-record-metadata">
+                            <summary>metadata</summary>
+                            <pre>${escapeHtml(metadata)}</pre>
+                        </details>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+
+        ragSampleRecords.innerHTML = html;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Global function for onclick handler
+    window.toggleRecordExpand = function(btn) {
+        const recordDiv = btn.closest('.sample-record-document');
+        const truncated = recordDiv.querySelector('.doc-truncated');
+        const full = recordDiv.querySelector('.doc-full');
+
+        if (truncated.style.display !== 'none') {
+            truncated.style.display = 'none';
+            full.style.display = 'inline';
+            btn.textContent = '[show less]';
+        } else {
+            truncated.style.display = 'inline';
+            full.style.display = 'none';
+            btn.textContent = '[show more]';
+        }
+    };
+
     // RAG Event listeners
     ragModeRadios.forEach(radio => {
         radio.addEventListener('change', toggleRagMode);
@@ -856,6 +970,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function onConnectionParamChange() {
         // Hide collection section when connection parameters change
         ragCollectionSection.style.display = 'none';
+        ragSampleSection.style.display = 'none';
+        ragSampleBtn.style.display = 'none';
         ragTestResult.innerHTML = '';
         updateRagSaveButtonState();
     }
@@ -873,10 +989,14 @@ document.addEventListener('DOMContentLoaded', () => {
     ragServerPort.addEventListener('input', onConnectionParamChange);
     ragTenantId.addEventListener('input', onConnectionParamChange);
     ragDatabase.addEventListener('input', onConnectionParamChange);
-    ragCollectionSelect.addEventListener('change', updateRagSaveButtonState);
+    ragCollectionSelect.addEventListener('change', () => {
+        updateRagSaveButtonState();
+        updateSampleButtonVisibility();
+    });
 
     ragTestBtn.addEventListener('click', testRagConnection);
     ragSaveBtn.addEventListener('click', saveRagConfig);
+    ragSampleBtn.addEventListener('click', fetchSampleRecords);
 
     // Load RAG config on page load
     loadRagConfig();

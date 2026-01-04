@@ -165,12 +165,24 @@
                             <!-- Collection Selection (shown after successful connection) -->
                             <div id="rag-collection-section" class="setting-item" style="display: none;">
                                 <label for="rag-collection-select">Collection</label>
-                                <div class="select-wrapper">
-                                    <select id="rag-collection-select">
-                                        <option value="">Select a collection...</option>
-                                    </select>
+                                <div class="collection-row">
+                                    <div class="select-wrapper">
+                                        <select id="rag-collection-select">
+                                            <option value="">Select a collection...</option>
+                                        </select>
+                                    </div>
+                                    <button type="button" id="rag-sample-btn" class="toolbar-btn" style="display: none;">Sample</button>
                                 </div>
                                 <span class="field-hint">Select a collection to use for RAG queries</span>
+                            </div>
+
+                            <!-- Sample Records Display -->
+                            <div id="rag-sample-section" class="sample-records-section" style="display: none;">
+                                <div class="sample-header">
+                                    <span class="sample-title">Sample Records</span>
+                                    <span id="rag-sample-count" class="sample-count"></span>
+                                </div>
+                                <div id="rag-sample-records" class="sample-records-container"></div>
                             </div>
                         </section>
                     </div>

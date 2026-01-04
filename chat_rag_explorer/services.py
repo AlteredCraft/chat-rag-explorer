@@ -1,3 +1,15 @@
+"""
+LLM chat service using OpenRouter API.
+
+Provides:
+- ChatService: Handles streaming chat completions via OpenAI-compatible API
+- Model listing from the OpenRouter API
+- Request correlation via request_id for log tracing
+- Token usage tracking and performance metrics
+
+The service uses the OpenAI SDK configured to point at OpenRouter,
+making it compatible with any OpenAI-compatible backend.
+"""
 import json
 import logging
 import time

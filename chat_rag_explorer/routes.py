@@ -1,3 +1,20 @@
+"""
+Flask routes and API endpoints.
+
+Web Pages:
+- / : Main chat interface
+- /settings : Configuration page
+
+API Endpoints:
+- /api/chat : POST - Stream chat completions from LLM
+- /api/models : GET - List available models from OpenRouter
+- /api/prompts : GET/POST - List or create system prompts
+- /api/prompts/<id> : GET/PUT/DELETE - Manage individual prompts
+- /api/rag/* : RAG configuration and ChromaDB management
+
+All API endpoints use request_id for log correlation and include
+timing metrics for observability.
+"""
 import json
 import logging
 import time
@@ -460,3 +477,29 @@ def get_rag_api_key_status():
     except Exception as e:
         logger.error(f"[{request_id}] GET /api/rag/api-key-status - Failed: {str(e)}", exc_info=True)
         return jsonify({"configured": False, "masked": None}), 500
+
+
+@main_bp.route("/api/rag/sample", methods=["POST"])
+def get_rag_sample():
+    """POST - Fetch sample records from a ChromaDB collection."""
+    request_id = generate_request_id()
+    start_time = time.time()
+
+    data = request.json
+    collection = data.get("collection", "")
+    logger.info(f"[{request_id}] POST /api/rag/sample - Fetching samples from '{collection}'")
+
+    try:
+        result = rag_config_service.get_sample_records(data, collection, limit=5, request_id=request_id)
+        elapsed = time.time() - start_time
+
+        if not result.get('success'):
+            logger.warning(f"[{request_id}] POST /api/rag/sample - Failed: {result.get('message')}")
+            return jsonify(result), 400
+
+        logger.info(f"[{request_id}] POST /api/rag/sample - Returned {result.get('count')} records ({elapsed:.3f}s)")
+        return jsonify(result)
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] POST /api/rag/sample - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "message": str(e)}), 500

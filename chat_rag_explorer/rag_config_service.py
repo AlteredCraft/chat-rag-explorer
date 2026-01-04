@@ -1,3 +1,16 @@
+"""
+RAG (Retrieval-Augmented Generation) configuration service.
+
+Manages ChromaDB vector database connections in three modes:
+- Local: PersistentClient pointing to a local directory
+- Server: HttpClient connecting to a ChromaDB server
+- Cloud: CloudClient for managed Chroma cloud instances
+
+Features:
+- Configuration persistence to rag_config.json
+- Connection testing and validation
+- Collection listing and sample record fetching
+"""
 import os
 import json
 import logging
@@ -258,6 +271,82 @@ class RagConfigService:
             masked = '****'
 
         return {'configured': True, 'masked': masked}
+
+    def _create_client(self, config_data, request_id=None):
+        """Create a ChromaDB client based on config mode."""
+        log_prefix = f"[{request_id}] " if request_id else ""
+        mode = config_data.get('mode', 'local')
+
+        if mode == 'local':
+            path = config_data.get('local_path')
+            if not path:
+                raise ValueError('Local path is required')
+            return chromadb.PersistentClient(path=path)
+
+        elif mode == 'server':
+            host = config_data.get('server_host', 'localhost')
+            port = int(config_data.get('server_port', 8000))
+            return chromadb.HttpClient(host=host, port=port)
+
+        elif mode == 'cloud':
+            tenant = config_data.get('cloud_tenant')
+            database = config_data.get('cloud_database')
+            api_key = Config.CHROMADB_API_KEY
+
+            if not tenant:
+                raise ValueError('Tenant ID is required')
+            if not database:
+                raise ValueError('Database name is required')
+            if not api_key:
+                raise ValueError('CHROMADB_API_KEY not configured in .env')
+
+            return chromadb.CloudClient(
+                tenant=tenant,
+                database=database,
+                api_key=api_key
+            )
+        else:
+            raise ValueError(f'Unknown mode: {mode}')
+
+    def get_sample_records(self, config_data, collection_name, limit=5, request_id=None):
+        """Fetch sample records from a ChromaDB collection."""
+        log_prefix = f"[{request_id}] " if request_id else ""
+
+        if not collection_name:
+            return {'success': False, 'message': 'Collection name is required'}
+
+        try:
+            client = self._create_client(config_data, request_id)
+            collection = client.get_collection(collection_name)
+
+            # Use peek to get sample records
+            results = collection.peek(limit=limit)
+
+            # Transform into a list of record objects
+            records = []
+            ids = results.get('ids', [])
+            documents = results.get('documents', [])
+            metadatas = results.get('metadatas', [])
+
+            for i, doc_id in enumerate(ids):
+                record = {
+                    'id': doc_id,
+                    'document': documents[i] if i < len(documents) else None,
+                    'metadata': metadatas[i] if i < len(metadatas) else None
+                }
+                records.append(record)
+
+            logger.info(f"{log_prefix}Fetched {len(records)} sample records from '{collection_name}'")
+            return {
+                'success': True,
+                'collection': collection_name,
+                'count': len(records),
+                'records': records
+            }
+
+        except Exception as e:
+            logger.error(f"{log_prefix}Failed to fetch sample records: {e}")
+            return {'success': False, 'message': str(e)}
 
 
 # Singleton instance

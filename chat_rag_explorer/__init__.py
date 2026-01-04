@@ -1,8 +1,24 @@
+"""
+Chat RAG Explorer - Flask application factory and initialization.
+
+This module provides:
+- create_app(): Factory function that creates and configures the Flask app
+- is_reloader_process(): Helper to detect Werkzeug's reloader child process
+
+The application factory pattern allows for easy testing and multiple
+app instances with different configurations.
+"""
 import logging
+import os
 from flask import Flask
 from config import Config
 
 logger = logging.getLogger(__name__)
+
+
+def is_reloader_process() -> bool:
+    """Check if running in Werkzeug reloader child process."""
+    return os.environ.get("WERKZEUG_RUN_MAIN") == "true"
 
 
 def create_app(config_class=Config):
@@ -13,14 +29,16 @@ def create_app(config_class=Config):
 
     setup_logging(app)
 
-    # Log startup configuration (after logging is set up)
-    _log_startup_config(app)
+    # Log startup configuration only in main process (not reloader child)
+    if not is_reloader_process():
+        _log_startup_config(app)
 
     from chat_rag_explorer.routes import main_bp
 
     app.register_blueprint(main_bp)
 
-    logger.info("Application startup complete - ready to serve requests")
+    if not is_reloader_process():
+        logger.info("Application startup complete - ready to serve requests")
 
     return app
 
@@ -52,5 +70,3 @@ def _log_startup_config(app):
     # Warn about potential issues
     if not api_key:
         logger.warning("OPENROUTER_API_KEY is not set - API calls will fail!")
-
-    logger.info("=" * 60)
