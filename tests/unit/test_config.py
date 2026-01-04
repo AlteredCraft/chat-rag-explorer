@@ -66,13 +66,13 @@ class TestConfig:
             assert config.Config.SERVER_PORT == 9000
 
     def test_chat_history_enabled_default(self):
-        """CHAT_HISTORY_ENABLED defaults to True."""
+        """CHAT_HISTORY_ENABLED defaults to False."""
         with patch.dict(os.environ, {}, clear=True):
             import importlib
             import config
             importlib.reload(config)
 
-            assert config.Config.CHAT_HISTORY_ENABLED is True
+            assert config.Config.CHAT_HISTORY_ENABLED is False
 
     def test_openrouter_base_url_constant(self):
         """OPENROUTER_BASE_URL is hardcoded constant."""

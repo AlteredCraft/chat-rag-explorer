@@ -45,11 +45,11 @@ class TestChatHistoryEntry:
 class TestChatHistoryService:
     """Tests for ChatHistoryService."""
 
-    def test_is_enabled_default_true(self, app_context):
-        """Chat history is enabled by default."""
+    def test_is_enabled_default_false(self, app_context):
+        """Chat history is disabled by default."""
         service = ChatHistoryService()
 
-        assert service.is_enabled() is True
+        assert service.is_enabled() is False
 
     def test_is_enabled_respects_config(self, app):
         """is_enabled respects CHAT_HISTORY_ENABLED config."""

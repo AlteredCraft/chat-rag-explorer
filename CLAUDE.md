@@ -29,6 +29,11 @@ uv run pytest --cov               # Run with coverage report
 uv run pytest -k "test_name"      # Run specific test by name
 ```
 
+**IMPORTANT:** 
+- After implementing new features or bug fixes, ALWAYS run the full test suite to ensure nothing is broken.
+- Code coverage is a good indicator but don't create 'Mock Fests' just to boost coverage numbers. Review low cov code for valueable tests and/or refactor opportunities to improve testability.
+- Our priority is to test our business logic, not external libraries or frameworks.
+
 **Test Policy**
 - Unit tests live in `tests/unit/`, organized to mirror `chat_rag_explorer/`
 - Unit tests must not make network calls - mock external dependencies

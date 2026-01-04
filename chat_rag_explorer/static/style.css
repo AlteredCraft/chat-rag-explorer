@@ -1167,26 +1167,41 @@ button:disabled {
 
 /* Message details link */
 .message-details-link {
-    display: inline-block;
-    font-size: 0.75rem;
-    color: #888;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--primary-color);
     text-decoration: none;
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--primary-color);
+    border-radius: 4px;
     cursor: pointer;
-    transition: color 0.2s;
+    transition: all 0.2s;
+    opacity: 0.8;
+}
+
+.message-details-link::before {
+    content: "ⓘ";
+    font-size: 0.9rem;
 }
 
 .message-details-link:hover {
-    color: var(--primary-color);
-    text-decoration: underline;
+    background: var(--primary-color);
+    color: #fff;
+    opacity: 1;
 }
 
 .message.user .message-details-link {
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.5);
 }
 
 .message.user .message-details-link:hover {
+    background: rgba(255, 255, 255, 0.2);
     color: #fff;
+    border-color: #fff;
 }
 
 /* ===== Sample Records ===== */

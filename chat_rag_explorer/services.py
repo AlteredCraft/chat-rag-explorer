@@ -20,6 +20,91 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 
+# --- Pure helper functions (easily testable without mocks) ---
+
+def mask_api_key(api_key):
+    """Mask an API key for safe logging.
+
+    Args:
+        api_key: The API key string to mask
+
+    Returns:
+        Masked string like "sk-abc12...xyz9" or "[MISSING]" if invalid
+    """
+    if api_key and len(api_key) > 12:
+        return f"{api_key[:8]}...{api_key[-4:]}"
+    return "[MISSING]"
+
+
+def build_chat_params(model, messages, temperature=None, top_p=None):
+    """Build API parameters for chat completion request.
+
+    Args:
+        model: Model identifier
+        messages: List of conversation messages
+        temperature: Optional sampling temperature (0-2)
+        top_p: Optional nucleus sampling parameter (0-1)
+
+    Returns:
+        Dict of API parameters ready for the OpenAI client
+    """
+    params = {
+        "model": model,
+        "messages": messages,
+        "stream": True,
+        "stream_options": {"include_usage": True},
+    }
+    if temperature is not None:
+        params["temperature"] = temperature
+    if top_p is not None:
+        params["top_p"] = top_p
+    return params
+
+
+def extract_usage_data(chunk, fallback_model):
+    """Extract token usage data from a stream chunk.
+
+    Args:
+        chunk: Stream chunk object with potential usage attribute
+        fallback_model: Model name to use if chunk.model is None
+
+    Returns:
+        Dict with token counts and model, or None if no usage data
+    """
+    if hasattr(chunk, "usage") and chunk.usage is not None:
+        return {
+            "prompt_tokens": chunk.usage.prompt_tokens,
+            "completion_tokens": chunk.usage.completion_tokens,
+            "total_tokens": chunk.usage.total_tokens,
+            "model": chunk.model or fallback_model,
+        }
+    return None
+
+
+def format_metadata_marker(usage_data):
+    """Format usage data as a metadata marker string.
+
+    Args:
+        usage_data: Dict containing token usage information
+
+    Returns:
+        String like "__METADATA__:{...json...}"
+    """
+    return f"__METADATA__:{json.dumps(usage_data)}"
+
+
+def sort_models_by_name(models):
+    """Sort model list by name (or id as fallback).
+
+    Args:
+        models: List of model dicts with 'name' and/or 'id' keys
+
+    Returns:
+        New sorted list (does not mutate input)
+    """
+    return sorted(models, key=lambda m: m.get("name", m.get("id", "")))
+
+
 class ChatService:
     def __init__(self):
         self.client = None
@@ -31,8 +116,7 @@ class ChatService:
             api_key = current_app.config["OPENROUTER_API_KEY"]
 
             # Log initialization with masked API key
-            masked_key = f"{api_key[:8]}...{api_key[-4:]}" if api_key and len(api_key) > 12 else "[MISSING]"
-            logger.info(f"Initializing OpenAI client - Base URL: {base_url}, API Key: {masked_key}")
+            logger.info(f"Initializing OpenAI client - Base URL: {base_url}, API Key: {mask_api_key(api_key)}")
 
             if not api_key:
                 logger.error("OPENROUTER_API_KEY is not configured")
@@ -67,20 +151,7 @@ class ChatService:
 
         try:
             # Build API call parameters
-            api_params = {
-                "model": target_model,
-                "messages": messages,
-                "stream": True,
-                "stream_options": {"include_usage": True},
-            }
-
-            # Add optional parameters if provided
-            if temperature is not None:
-                api_params["temperature"] = temperature
-            if top_p is not None:
-                api_params["top_p"] = top_p
-
-            # Note: stream_options={"include_usage": True} is required for token counts in streams
+            api_params = build_chat_params(target_model, messages, temperature, top_p)
             stream = client.chat.completions.create(**api_params)
 
             chunk_count = 0
@@ -95,19 +166,13 @@ class ChatService:
                     logger.debug(f"[{req_id}] Time to first chunk: {ttfc:.3f}s")
 
                 # Check for usage data (usually in the final chunk when stream_options is set)
-                if hasattr(chunk, "usage") and chunk.usage is not None:
-                    usage_data = {
-                        "prompt_tokens": chunk.usage.prompt_tokens,
-                        "completion_tokens": chunk.usage.completion_tokens,
-                        "total_tokens": chunk.usage.total_tokens,
-                        "model": chunk.model or target_model,
-                    }
+                usage_data = extract_usage_data(chunk, target_model)
+                if usage_data:
                     logger.info(
                         f"[{req_id}] Token usage - Prompt: {usage_data['prompt_tokens']}, "
                         f"Completion: {usage_data['completion_tokens']}, Total: {usage_data['total_tokens']}"
                     )
-                    # Send as a special metadata marker
-                    yield f"__METADATA__:{json.dumps(usage_data)}"
+                    yield format_metadata_marker(usage_data)
 
                 if len(chunk.choices) > 0:
                     content = chunk.choices[0].delta.content
@@ -160,10 +225,7 @@ class ChatService:
             response.raise_for_status()
 
             data = response.json()
-            models = data.get("data", [])
-
-            # Sort models by name for better UX
-            models.sort(key=lambda m: m.get("name", m.get("id", "")))
+            models = sort_models_by_name(data.get("data", []))
 
             logger.info(f"[{req_id}] Successfully fetched {len(models)} models ({elapsed:.3f}s)")
             return models
