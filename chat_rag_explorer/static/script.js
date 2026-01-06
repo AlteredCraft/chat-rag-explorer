@@ -101,6 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const SESSION_HISTORY_KEY = 'chat-rag-conversation-history';
     const SESSION_METRICS_KEY = 'chat-rag-session-metrics';
     const SESSION_METADATA_KEY = 'chat-rag-message-metadata';
+    const SESSION_RETRY_MSG_KEY = 'chat-rag-retry-message';
 
     // Per-message metadata for details modal
     let messageMetadata = {};
@@ -126,6 +127,25 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveMessageMetadata(index, data) {
         messageMetadata[index] = data;
         sessionStorage.setItem(SESSION_METADATA_KEY, JSON.stringify(messageMetadata));
+    }
+
+    // Save retry message (for restoring after navigation on error)
+    function saveRetryMessage(message) {
+        sessionStorage.setItem(SESSION_RETRY_MSG_KEY, message);
+    }
+
+    // Clear retry message (after successful send)
+    function clearRetryMessage() {
+        sessionStorage.removeItem(SESSION_RETRY_MSG_KEY);
+    }
+
+    // Restore retry message if exists
+    function restoreRetryMessage() {
+        const saved = sessionStorage.getItem(SESSION_RETRY_MSG_KEY);
+        if (saved) {
+            messageInput.value = saved;
+            AppLogger.debug('Restored retry message from session');
+        }
     }
 
     // Restore conversation from sessionStorage and re-render to DOM
@@ -343,6 +363,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const restoredFromSession = restoreConversationFromSession();
     loadSystemPrompt(restoredFromSession); // Skip history reset if we restored
 
+    // Restore any pending draft message (from navigation or error)
+    restoreRetryMessage();
+
+    // Save draft message when navigating away
+    window.addEventListener('beforeunload', () => {
+        const draft = messageInput.value.trim();
+        if (draft) {
+            saveRetryMessage(draft);
+        } else {
+            clearRetryMessage();
+        }
+    });
+
     // Configure marked for better chat-style breaks
     marked.setOptions({
         breaks: true,
@@ -354,6 +387,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const message = messageInput.value.trim();
         if (!message) return;
+
+        // Store original message for potential retry on error
+        const originalMessage = message;
 
         const model = getCurrentModel();
         const requestStartTime = performance.now();
@@ -386,6 +422,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let chunkCount = 0;
         let firstChunkTime = null;
         let receivedMetadata = null; // Store full metadata from backend
+        let errorOccurred = false;
+        let errorChunk = null;
 
         try {
             // Build request body with optional parameters
@@ -442,6 +480,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     AppLogger.debug('Time to first chunk', { ttfc_ms: ttfc.toFixed(2) });
                 }
 
+                // Check for error chunks from backend
+                if (chunk.startsWith('Error:')) {
+                    errorOccurred = true;
+                    errorChunk = chunk;
+                    AppLogger.error('Received error chunk from backend', { chunk });
+                    continue; // Don't render error in chat
+                }
+
                 // Check for metadata marker (full entry from backend)
                 if (chunk.startsWith('__METADATA__:')) {
                     try {
@@ -449,8 +495,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         receivedMetadata = JSON.parse(metadataJson);
                         AppLogger.info('Metadata received from backend', receivedMetadata);
 
-                        // Update metrics display
-                        if (receivedMetadata.tokens) {
+                        // Update metrics display (only for successful responses)
+                        if (receivedMetadata.tokens && !errorOccurred) {
                             updateMetrics({
                                 model: receivedMetadata.model,
                                 prompt_tokens: receivedMetadata.tokens.prompt_tokens,
@@ -475,20 +521,58 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const totalTime = performance.now() - requestStartTime;
-            AppLogger.info('Chat response completed', {
-                chunks: chunkCount,
-                responseLength: messageBuffer.length,
-                totalTime_ms: totalTime.toFixed(2)
-            });
 
-            // Add bot message to history
-            if (messageBuffer) {
-                conversationHistory.push({ role: 'assistant', content: messageBuffer });
+            // Handle streaming error
+            if (errorOccurred) {
+                AppLogger.error('Chat streaming error detected', {
+                    chunks: chunkCount,
+                    totalTime_ms: totalTime.toFixed(2),
+                    errorChunk: errorChunk
+                });
+
+                // Remove both user and bot messages from DOM
+                const botMessage = botMessageContent.closest('.message');
+                if (botMessage) {
+                    const userMessage = botMessage.previousElementSibling;
+                    if (userMessage && userMessage.classList.contains('message-user')) {
+                        userMessage.remove();
+                    }
+                    botMessage.remove();
+                }
+
+                // Remove user message from conversation history
+                conversationHistory.pop();
                 saveConversationToSession();
 
-                // Save assistant metadata (received from backend - DRY with chat-history.jsonl)
-                if (receivedMetadata) {
-                    saveMessageMetadata(assistantMsgIndex, receivedMetadata);
+                // Decrement message indices (both messages removed)
+                messageIndex -= 2;
+
+                // Restore original message to input for retry (persist for navigation)
+                messageInput.value = originalMessage;
+                saveRetryMessage(originalMessage);
+
+                // Show error modal with details
+                const cleanError = errorChunk.replace(/^Error:\s*/, '');
+                showErrorModal(cleanError, receivedMetadata);
+            } else {
+                AppLogger.info('Chat response completed', {
+                    chunks: chunkCount,
+                    responseLength: messageBuffer.length,
+                    totalTime_ms: totalTime.toFixed(2)
+                });
+
+                // Clear any pending retry message on success
+                clearRetryMessage();
+
+                // Add bot message to history
+                if (messageBuffer) {
+                    conversationHistory.push({ role: 'assistant', content: messageBuffer });
+                    saveConversationToSession();
+
+                    // Save assistant metadata (received from backend - DRY with chat-history.jsonl)
+                    if (receivedMetadata) {
+                        saveMessageMetadata(assistantMsgIndex, receivedMetadata);
+                    }
                 }
             }
 
@@ -499,7 +583,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalTime_ms: totalTime.toFixed(2),
                 chunksReceived: chunkCount
             });
-            botMessageContent.innerHTML += ` <span style="color: red;">[Error: ${error.message}]</span>`;
+
+            // Remove both user and bot messages from DOM
+            const botMessage = botMessageContent.closest('.message');
+            if (botMessage) {
+                const userMessage = botMessage.previousElementSibling;
+                if (userMessage && userMessage.classList.contains('message-user')) {
+                    userMessage.remove();
+                }
+                botMessage.remove();
+            }
+
+            // Remove user message from conversation history
+            conversationHistory.pop();
+            saveConversationToSession();
+
+            // Decrement message indices (both messages removed)
+            messageIndex -= 2;
+
+            // Restore original message to input for retry (persist for navigation)
+            messageInput.value = originalMessage;
+            saveRetryMessage(originalMessage);
+
+            // Show error modal
+            showErrorModal(error.message, {
+                type: 'NetworkError',
+                model: model,
+                timing: {
+                    total_ms: parseFloat(totalTime.toFixed(2))
+                },
+                chunksReceived: chunkCount
+            });
         } finally {
             messageInput.disabled = false;
             submitButton.disabled = false;
@@ -545,9 +659,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (role === 'user') {
             contentDiv.textContent = text;
         } else {
-            // For bot, if there's initial text, parse it as markdown
-            const html = marked.parse(text || '');
-            contentDiv.innerHTML = DOMPurify.sanitize(html);
+            // For bot, show spinner if empty, otherwise parse markdown
+            if (!text) {
+                contentDiv.innerHTML = '<span class="typing-spinner"></span>';
+            } else {
+                const html = marked.parse(text);
+                contentDiv.innerHTML = DOMPurify.sanitize(html);
+            }
         }
 
         messageDiv.appendChild(contentDiv);
@@ -588,6 +706,74 @@ document.addEventListener('DOMContentLoaded', () => {
                 detailsModal.classList.remove('visible');
             }
         });
+    }
+
+    // ==================== Error Modal ====================
+
+    const errorModal = document.getElementById('error-modal');
+    const errorMessage = document.getElementById('error-message');
+    const errorDetails = document.getElementById('error-details');
+    const errorDetailsContainer = document.getElementById('error-details-container');
+    const errorModalClose = document.getElementById('error-modal-close');
+
+    if (errorModalClose) {
+        errorModalClose.addEventListener('click', () => {
+            errorModal.classList.remove('visible');
+        });
+    }
+
+    if (errorModal) {
+        errorModal.addEventListener('click', (e) => {
+            if (e.target === errorModal) {
+                errorModal.classList.remove('visible');
+            }
+        });
+    }
+
+    /**
+     * Extract user-friendly message from error string.
+     * Tries to find 'message': '...' pattern in Python dict or JSON.
+     * @param {string} errorStr - Raw error string
+     * @returns {string} Extracted message or original string
+     */
+    function extractErrorMessage(errorStr) {
+        // Try to extract 'message': '...' from Python dict syntax
+        const singleQuoteMatch = errorStr.match(/'message':\s*'([^']+)'/);
+        if (singleQuoteMatch) {
+            return singleQuoteMatch[1];
+        }
+
+        // Try to extract "message": "..." from JSON syntax
+        const doubleQuoteMatch = errorStr.match(/"message":\s*"([^"]+)"/);
+        if (doubleQuoteMatch) {
+            return doubleQuoteMatch[1];
+        }
+
+        // Return original if no match
+        return errorStr;
+    }
+
+    /**
+     * Display an error in a modal dialog.
+     * @param {string} rawError - The raw error string from backend
+     * @param {Object|null} metadata - Optional metadata object from backend
+     */
+    function showErrorModal(rawError, metadata = null) {
+        AppLogger.error('Showing error modal', { rawError, hasMetadata: !!metadata });
+
+        // Extract user-friendly message for display
+        const friendlyMessage = extractErrorMessage(rawError);
+        errorMessage.textContent = friendlyMessage;
+
+        // Build details section with raw error and metadata
+        let detailsText = rawError;
+        if (metadata) {
+            detailsText += '\n\nMETADATA:\n' + JSON.stringify(metadata, null, 2);
+        }
+        errorDetails.textContent = detailsText;
+        errorDetailsContainer.style.display = 'block';
+
+        errorModal.classList.add('visible');
     }
 
     function showDetailsModal(msgIndex) {
