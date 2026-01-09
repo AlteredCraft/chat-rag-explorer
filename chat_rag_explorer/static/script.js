@@ -802,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (metadata.tokens) {
-            html += `<div class="details-meta-item"><span class="details-meta-label">Tokens:</span><span class="details-meta-value">${metadata.tokens.prompt_tokens || 0} → ${metadata.tokens.completion_tokens || 0} (${metadata.tokens.total_tokens || 0})</span></div>`;
+            html += `<div class="details-meta-item"><span class="details-meta-label">Tokens:</span><span class="details-meta-value">${metadata.tokens.prompt_tokens || 0} + ${metadata.tokens.completion_tokens || 0} → ${metadata.tokens.total_tokens || 0}</span></div>`;
         }
 
         if (metadata.timing) {
