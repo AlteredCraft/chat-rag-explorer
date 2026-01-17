@@ -220,3 +220,5 @@ logs/*
 !logs/.gitkeep
 
 .vscode/
+
+/data/chroma_db
