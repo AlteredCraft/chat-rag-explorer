@@ -1,3 +1,10 @@
+---
+section_number: 2
+section_title: "The Engine Room of AI: Tokens, Embeddings, and Context Windows"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 2: The Engine Room of AI: Tokens, Embeddings, and Context Windows
 
 In the last chapter, we had our first conversation with an AI. It felt simple, almost magical. But as developers, we know that magic is just well-executed technology. To build powerful, reliable, and cost-effective AI applications, we need to look under the hood. We don't need to become mechanics, but we do need to understand the basic "physics" that govern how these models operate.

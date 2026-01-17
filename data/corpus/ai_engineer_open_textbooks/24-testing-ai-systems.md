@@ -1,3 +1,10 @@
+---
+section_number: 24
+section_title: "Testing AI Systems"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 24: Testing AI Systems
 
 In traditional software development, testing is a world of certainty. An assertion like `assert add(2, 2) == 4` is absolute. It will pass or fail with perfect predictability. This deterministic nature is the bedrock upon which we build reliable software. When we introduce Large Language Models into our applications, we step into a new, probabilistic world. An LLM is not a calculator; it's a creative engine. Asking it the same question twice might yield two slightly different, yet equally correct, answers.

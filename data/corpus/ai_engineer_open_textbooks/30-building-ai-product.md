@@ -1,3 +1,10 @@
+---
+section_number: 30
+section_title: "Building Your AI Product"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 30: Building Your AI Product
 
 You have reached the final chapter of this guide. You have journeyed from the fundamental concepts of tokens and embeddings to the intricate architectures of scalable, real-time AI systems. You have mastered the APIs of the world's leading AI providers, engineered sophisticated prompts, and learned to build and test applications with the discipline of a production engineer. You are no longer just a developer who *uses* AI; you are an AI systems architect.

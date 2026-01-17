@@ -1,3 +1,10 @@
+---
+section_number: 10
+section_title: "Advanced Prompting Strategies"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 10: Advanced Prompting Strategies
 
 In the last chapter, we mastered the fundamentals of prompt engineering. We learned to be specific, provide context, and use patterns like few-shot and chain-of-thought. These techniques are the bedrock of effective AI interaction and will serve you well for 80% of use cases.

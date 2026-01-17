@@ -1,3 +1,10 @@
+---
+section_number: 23
+section_title: "Monitoring and Observability in AI Systems"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 23: Monitoring and Observability in AI Systems
 
 In traditional software, when something breaks, it often breaks loudly. A server crashes, an endpoint returns a `500` error, a database query times out. You get an alert, you check the logs, and you find the root cause. AI applications, however, can fail silently and insidiously. A model can start "hallucinating" more often, its responses can become subtly less accurate, or a change in user behavior can cause costs to skyrocket without a single error ever being thrown.

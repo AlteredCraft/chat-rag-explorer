@@ -1,3 +1,10 @@
+---
+section_number: 28
+section_title: "AI Workflows and Orchestration"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 28: AI Workflows and Orchestration
 
 In the preceding chapters, we have built increasingly sophisticated AI systems. We've created agents that can use tools, chains that perform multi-step reasoning, and applications that serve models through robust APIs. However, most of our designs have followed a linear path: a request comes in, a sequence of actions occurs, and a response goes out. But real-world business processes are rarely so simple. They involve branching logic, parallel tasks, human approvals, and error recovery—in other words, they are **workflows**.

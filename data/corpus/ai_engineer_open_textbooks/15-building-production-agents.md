@@ -1,3 +1,10 @@
+---
+section_number: 15
+section_title: "Building Production-Ready Agents"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 15: Building Production-Ready Agents
 
 So far, we have built agents in the clean, predictable environment of our development machines. We have explored architectures, given them tools, and taught them to reason. But the journey from a clever prototype to a robust, reliable production system is one of the most challenging transitions in software engineering.

@@ -1,3 +1,10 @@
+---
+section_number: 29
+section_title: "Emerging Patterns and Future Trends"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 29: Emerging Patterns and Future Trends
 
 The world of AI is moving at a breathtaking pace. The models, techniques, and architectures we use today were science fiction just a few years ago. As a developer in this space, it's not enough to master the present; you must also have a clear view of the future. The patterns that are emerging in research labs and cutting-edge startups today will be the standard tools of tomorrow.

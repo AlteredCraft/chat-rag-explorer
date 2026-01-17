@@ -1,3 +1,10 @@
+---
+section_number: 17
+section_title: "Building AI-Powered Web Applications with Python"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 17: Building AI-Powered Web Applications with Python
 
 So far, our AI agents and models have lived primarily in scripts and command-line interfaces. While powerful, this isn't how most people interact with software. To deliver the value of your AI to a broad audience, you need to make it accessible. The most universal way to do that is through a web application.

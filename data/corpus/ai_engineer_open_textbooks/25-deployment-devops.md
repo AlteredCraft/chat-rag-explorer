@@ -1,3 +1,10 @@
+---
+section_number: 25
+section_title: "Deployment and DevOps for AI Applications"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 25: Deployment and DevOps for AI Applications
 
 You have designed a robust architecture, engineered brilliant prompts, and built a sophisticated AI application on your local machine. Now comes the final, critical hurdle: moving from the comfort of `localhost` to the unpredictable reality of a live production environment. This is the realm of DevOps—the set of practices that combines software development and IT operations to shorten the development lifecycle and provide continuous delivery with high software quality.

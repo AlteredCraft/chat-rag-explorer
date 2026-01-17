@@ -1,3 +1,10 @@
+---
+section_number: 1
+section_title: "Welcome to AI Engineering"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 1: Welcome to AI Engineering
 
 Welcome to the world of AI engineering. If you're a developer, you're in the right place at the right time. The tools we're about to explore are not just another new technology; they represent a fundamental shift in how we build software. This chapter will be your gentle introduction, stripping away the hype and focusing on the core concepts you need to get started. Our goal is to go from zero to your first working AI interaction in just a few pages.

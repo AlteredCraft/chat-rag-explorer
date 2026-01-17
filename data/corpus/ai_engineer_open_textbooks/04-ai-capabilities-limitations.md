@@ -1,3 +1,10 @@
+---
+section_number: 4
+section_title: "Understanding AI Capabilities and Limitations"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 4: Understanding AI Capabilities and Limitations
 
 Before we build more complex applications, we must take a crucial step back and develop a deep, practical understanding of what AI can—and, more importantly, *cannot*—do reliably. The most common mistake new AI developers make is treating Large Language Models (LLMs) as infallible, all-knowing oracles. They are not.

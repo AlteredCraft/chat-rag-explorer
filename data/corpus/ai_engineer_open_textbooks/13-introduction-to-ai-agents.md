@@ -1,3 +1,10 @@
+---
+section_number: 13
+section_title: "From Chatbots to Autonomous Agents"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 13: From Chatbots to Autonomous Agents
 
 For decades, our interactions with computers have been defined by a simple loop: we make a request, and the machine gives a response. This model powers everything from command-line tools to sophisticated chatbots. But what if an AI could do more than just respond? What if it could perceive its environment, maintain its own goals, make plans, and take action—all without constant human intervention?

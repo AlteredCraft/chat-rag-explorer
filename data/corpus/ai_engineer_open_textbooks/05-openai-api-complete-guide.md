@@ -1,3 +1,10 @@
+---
+section_number: 5
+section_title: "A Developer's Guide to the OpenAI API"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 5: A Developer's Guide to the OpenAI API
 
 In the previous chapters, we explored the concepts behind AI. Now, it's time to roll up our sleeves and become practitioners. This chapter is a complete, hands-on guide to the OpenAI API, the tool that allows your Python applications to communicate with powerful models like GPT-4. We will move from the simplest possible API call to building sophisticated applications that use function calling, vision, and audio.

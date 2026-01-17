@@ -1,3 +1,10 @@
+---
+section_number: 12
+section_title: "Domain-Specific Prompting"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 12: Domain-Specific Prompting
 
 So far, we have explored universal prompting strategies that work across a wide range of tasks. However, to unlock the highest levels of performance and create truly expert-level AI systems, we must move from general instructions to **domain-specific prompting**. This involves embedding deep, industry-specific knowledge, terminology, and workflows directly into your prompts.

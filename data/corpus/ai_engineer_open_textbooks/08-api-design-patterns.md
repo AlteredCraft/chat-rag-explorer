@@ -1,3 +1,10 @@
+---
+section_number: 8
+section_title: "API Design Patterns and Best Practices"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 8: API Design Patterns and Best Practices
 
 Building a simple AI application is one thing; building a robust, scalable, and resilient one is an entirely different engineering challenge. As you move from prototypes to production, your application will face the harsh realities of the real world: network failures, API rate limits, service outages, and unpredictable user load.

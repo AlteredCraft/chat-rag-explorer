@@ -1,3 +1,10 @@
+---
+section_number: 14
+section_title: "Giving Your Agent Tools"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 14: Giving Your Agent Tools
 
 An AI model, no matter how intelligent, is fundamentally a brain in a jar. It can reason, analyze, and generate text with incredible sophistication, but it is disconnected from the world. It cannot check a database, send an email, or read a sensor. To become a true agent that can *act*, it needs hands. In the world of AI, these hands are called **tools**.

@@ -1,3 +1,10 @@
+---
+section_number: 20
+section_title: "Scaling AI Applications"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 20: Scaling AI Applications
 
 Building a proof-of-concept AI application is an exciting first step. Making it run for ten, a thousand, or a million users is an entirely different engineering discipline. Scaling AI applications presents a unique set of challenges that go beyond traditional web scaling. The variable latency of AI models, their intensive resource consumption, and the constant pressure of API costs require a specialized architectural approach.

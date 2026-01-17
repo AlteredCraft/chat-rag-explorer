@@ -1,3 +1,10 @@
+---
+section_number: 6
+section_title: "Mastering the Anthropic Claude API"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 6: Mastering the Anthropic Claude API
 
 While OpenAI's GPT models are a fantastic entry point into the world of AI, a skilled developer knows that having multiple tools in their toolkit is essential. Anthropic's family of Claude models offers a powerful alternative, known for its strong reasoning capabilities, large context windows, and a focus on creating helpful, harmless, and honest AI systems.

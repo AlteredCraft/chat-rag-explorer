@@ -1,3 +1,10 @@
+---
+section_number: 21
+section_title: "AI Application Cost Optimization"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 21: AI Application Cost Optimization
 
 When you first begin building with AI, the focus is on what's possible. The creative energy is high, and the results can feel magical. Then, the first monthly invoice from your AI provider arrives, and a different kind of magic trick appears: making your budget disappear.

@@ -1,3 +1,10 @@
+---
+section_number: 27
+section_title: "Retrieval-Augmented Generation (RAG)"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 27: Retrieval-Augmented Generation (RAG)
 
 In the last chapter, we learned how to specialize an AI by fine-tuning it on custom data. Fine-tuning is incredibly powerful for teaching an AI a new *skill* or *style*. However, it is an inefficient and often ineffective way to teach an AI new *knowledge*. A fine-tuned model's knowledge is static—it's frozen at the moment its training completes. It cannot learn about events that happened yesterday, nor can it access your company's private, proprietary documents.

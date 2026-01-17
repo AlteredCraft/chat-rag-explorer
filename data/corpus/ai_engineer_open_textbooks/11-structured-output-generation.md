@@ -1,3 +1,10 @@
+---
+section_number: 11
+section_title: "Mastering Structured Output"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 11: Mastering Structured Output
 
 In software development, data is only useful if it's predictable. A web application expects a JSON object, a database expects a SQL query, and a configuration file expects a specific format like XML or YAML. While large language models are masters of generating creative, unstructured text, this flexibility becomes a liability when your application needs to programmatically process the AI's response.

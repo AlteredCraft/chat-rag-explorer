@@ -1,3 +1,10 @@
+---
+section_number: 22
+section_title: "Security and Safety in AI Applications"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 22: Security and Safety in AI Applications
 
 As we build increasingly powerful applications with AI, we also inherit a new set of responsibilities. An AI model connected to your systems and data is a powerful tool, but like any tool, it can be misused if not properly secured. The attack surface of an AI application is different and, in some ways, broader than that of traditional software. It's not just about protecting servers from network intrusions; it's about protecting the very logic and reasoning core of your application from manipulation.

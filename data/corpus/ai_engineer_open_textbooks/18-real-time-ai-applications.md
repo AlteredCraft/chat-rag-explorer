@@ -1,3 +1,10 @@
+---
+section_number: 18
+section_title: "Architecting Real-Time AI Applications"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 18: Architecting Real-Time AI Applications
 
 In many modern applications, "fast" is not fast enough. We need "now." Imagine an AI monitoring a factory floor; a 30-second delay in analyzing a critical temperature spike could be the difference between a routine adjustment and a catastrophic failure. Consider a financial trading bot; a half-second lag could represent millions of dollars in lost opportunity. This is the domain of real-time AI.

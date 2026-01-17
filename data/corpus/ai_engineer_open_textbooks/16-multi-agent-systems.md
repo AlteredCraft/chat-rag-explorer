@@ -1,3 +1,10 @@
+---
+section_number: 16
+section_title: "An Introduction to Multi-Agent Systems"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 16: An Introduction to Multi-Agent Systems
 
 So far, we have focused on building and refining single, autonomous agents. These agents can be incredibly powerful, but they are like a brilliant solo performer. To tackle truly large-scale, complex problems, we often need more than a soloist; we need an entire orchestra. This is the domain of **multi-agent systems (MAS)**.

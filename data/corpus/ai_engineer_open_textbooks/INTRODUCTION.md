@@ -1,3 +1,10 @@
+---
+section_number: 31
+section_title: "Introduction to AI Engineering"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Introduction to AI Engineering
 
 Over the past few months, I have spoken with a few friends—all bright people, senior software engineers who wanted to learn about AI, but couldn't figure out where to begin. They were frustrated. They knew that the AI revolution is happening, but they felt completely lost. "Where do we even start?" one asked. "I'm drowning in a firehose of information. One blog tells me to learn linear algebra, another gives me a five-line 'Hello, AI' tutorial that's useless for my actual job."

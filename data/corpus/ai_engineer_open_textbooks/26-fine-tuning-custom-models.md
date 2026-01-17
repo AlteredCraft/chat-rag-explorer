@@ -1,3 +1,10 @@
+---
+section_number: 26
+section_title: "Fine-Tuning and Custom Models"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 26: Fine-Tuning and Custom Models
 
 You have become a master of prompting. You can guide, constrain, and persuade general-purpose AI models to perform incredible feats. You have learned to build applications that are reliable, observable, and secure. But what happens when you reach the limits of prompting? What do you do when the task requires a level of specialized knowledge, style, or a completely new skill that no amount of prompt engineering can consistently deliver?

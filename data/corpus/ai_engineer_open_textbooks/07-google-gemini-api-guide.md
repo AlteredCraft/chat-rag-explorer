@@ -1,3 +1,10 @@
+---
+section_number: 7
+section_title: "Mastering the Google Gemini API"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 7: Mastering the Google Gemini API
 
 Having explored the APIs from OpenAI and Anthropic, we now turn our attention to the third major player in the AI landscape: Google. With its Gemini family of models, Google has built an API that is "multimodal native" from the ground up, designed to seamlessly handle a mix of text, images, audio, and video. This makes it an exceptionally powerful tool for building applications that need to understand the world in a more holistic way.

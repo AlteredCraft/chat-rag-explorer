@@ -1,3 +1,10 @@
+---
+section_number: 3
+section_title: "Setting Up Your Development Environment"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 3: Setting Up Your Development Environment
 
 Every great journey begins with a first step, and in software development, that first step is setting up a clean, secure, and reproducible environment. This chapter is your guide to building a solid foundation for all the AI projects to come. We'll move methodically, ensuring that from day one, you're following best practices for managing your projects, code, and—most importantly—your secret API keys.

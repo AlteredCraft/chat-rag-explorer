@@ -1,3 +1,10 @@
+---
+section_number: 9
+section_title: "Fundamental Prompt Engineering"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 9: Fundamental Prompt Engineering
 
 In previous chapters, we learned how to make API calls to AI models. Now, we will learn the art and science of **prompt engineering**—the skill of crafting inputs that guide an AI to produce the exact output you desire. A well-engineered prompt is the difference between a generic, unhelpful response and a precise, actionable, and reliable one.

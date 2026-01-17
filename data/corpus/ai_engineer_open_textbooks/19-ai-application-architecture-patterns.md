@@ -1,3 +1,10 @@
+---
+section_number: 19
+section_title: "AI Application Architecture Patterns"
+title: "Introduction to AI Engineering (for software engineers)"
+url: "https://github.com/obinnaokechukwu/introduction-to-ai-engineering"
+---
+
 # Chapter 19: AI Application Architecture Patterns
 
 Building a successful AI application involves more than just writing clever prompts. As your application grows from a simple script to a production system, its underlying architecture becomes the single most important factor determining its scalability, reliability, and maintainability. AI-powered systems present unique architectural challenges—variable latency, high computational costs, and complex state management—that traditional software architectures are often ill-equipped to handle.
