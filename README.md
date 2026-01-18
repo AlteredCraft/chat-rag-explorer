@@ -54,7 +54,9 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 To ingest your own documents for RAG retrieval, see the [utils/README.md](utils/README.md) for CLI tools:
 
 - **split.py** - Split large markdown files into chapters by heading pattern
-- **ingest.py** - Chunk and ingest markdown files into ChromaDB
+- **ingest.py** - Two-phase workflow: preview chunks → inspect → ingest to ChromaDB
+
+The ingest tool writes human-readable chunk previews to `data/chunks/` so you can tune chunking parameters before committing to the vector database.
 
 ---
 
@@ -84,6 +86,7 @@ chat-rag-explorer/
 │   └── ingest.py                # Ingest markdown into ChromaDB
 ├── data/
 │   ├── corpus/                  # Source markdown documents
+│   ├── chunks/                  # Chunk previews for inspection (gitignored)
 │   └── chroma_db/               # ChromaDB vector store
 ├── prompts/                     # System prompt templates (markdown)
 ├── logs/                        # Application logs (gitignored)

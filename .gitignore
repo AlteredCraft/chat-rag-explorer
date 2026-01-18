@@ -222,3 +222,4 @@ logs/*
 .vscode/
 
 /data/chroma_db
+/data/chunks

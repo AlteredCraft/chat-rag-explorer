@@ -24,7 +24,10 @@ See utils/README.md for usage examples.
 """
 
 import argparse
+import json
+import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from chromadb import PersistentClient
@@ -34,6 +37,7 @@ import frontmatter
 from tokenizers import Tokenizer
 
 RAG_DB_FILE_PATH = Path(__file__).parent.parent / "data" / "chroma_db"
+CHUNKS_DIR = Path(__file__).parent.parent / "data" / "chunks"
 
 # Initialize tokenizer globally to avoid reloading it for every file
 # We use the same model as ChromaDB's default embedding function
@@ -167,12 +171,233 @@ def chunk_by_tokens(content: str, chunk_size: int = 256, overlap: int = 50) -> l
     return chunks
 
 
+# ==================== Chunk File Operations ====================
+
+
+def clear_chunks_dir(corpus_name: str) -> Path:
+    """
+    Clear and recreate the chunks directory for a corpus.
+
+    Args:
+        corpus_name: Name of the corpus (used as subdirectory name)
+
+    Returns:
+        Path to the chunks directory
+    """
+    chunks_dir = CHUNKS_DIR / corpus_name
+    if chunks_dir.exists():
+        shutil.rmtree(chunks_dir)
+    chunks_dir.mkdir(parents=True, exist_ok=True)
+    return chunks_dir
+
+
+def write_chunk_file(
+    chunks_dir: Path,
+    file_index: int,
+    source_file: str,
+    metadata: dict,
+    params: dict,
+    chunks: list[dict],
+) -> Path:
+    """
+    Write chunk data for a single source file as readable markdown.
+
+    Output format uses YAML frontmatter for metadata and delimiters
+    between chunks for easy visual inspection.
+
+    Args:
+        chunks_dir: Directory to write chunks to
+        file_index: Index for ordering (used in filename)
+        source_file: Original source filename
+        metadata: Frontmatter metadata from source file
+        params: Chunking parameters (chunk_size, overlap)
+        chunks: List of chunk dicts with index, token_count, text
+
+    Returns:
+        Path to the written chunk file
+    """
+    file_stem = Path(source_file).stem
+    chunk_file = chunks_dir / f"{file_index:02d}_{file_stem}.chunks.md"
+
+    # Build frontmatter
+    lines = ["---"]
+    lines.append(f'source_file: "{source_file}"')
+    lines.append(f"chunk_size: {params.get('chunk_size', 256)}")
+    lines.append(f"overlap: {params.get('overlap', 50)}")
+    lines.append(f"total_chunks: {len(chunks)}")
+
+    # Add original metadata
+    for key, value in metadata.items():
+        if isinstance(value, str):
+            # Quote strings that might have special chars
+            lines.append(f'{key}: "{value}"')
+        else:
+            lines.append(f"{key}: {value}")
+
+    lines.append("---")
+    lines.append("")
+
+    # Write each chunk with delimiter
+    for chunk in chunks:
+        idx = chunk["index"]
+        tokens = chunk["token_count"]
+        text = chunk["text"]
+
+        lines.append(f"----- chunk {idx} ({tokens} tokens) -----")
+        lines.append("")
+        lines.append(text)
+        lines.append("")
+
+    with open(chunk_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+    return chunk_file
+
+
+def write_manifest(
+    chunks_dir: Path,
+    corpus_name: str,
+    source_dir: str,
+    params: dict,
+    stats: dict,
+) -> Path:
+    """
+    Write manifest file with chunking summary.
+
+    Args:
+        chunks_dir: Directory containing chunk files
+        corpus_name: Name of the corpus
+        source_dir: Path to source directory
+        params: Chunking parameters
+        stats: Summary statistics (total_files, total_chunks, total_tokens)
+
+    Returns:
+        Path to the manifest file
+    """
+    manifest_file = chunks_dir / "manifest.json"
+
+    data = {
+        "corpus_name": corpus_name,
+        "source_dir": source_dir,
+        "created_at": datetime.now().isoformat(),
+        "params": params,
+        "summary": stats,
+    }
+
+    with open(manifest_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+    return manifest_file
+
+
+def read_manifest(chunks_dir: Path) -> dict | None:
+    """
+    Read manifest file from chunks directory.
+
+    Args:
+        chunks_dir: Directory containing chunk files
+
+    Returns:
+        Manifest data dict, or None if not found
+    """
+    manifest_file = chunks_dir / "manifest.json"
+    if not manifest_file.exists():
+        return None
+
+    with open(manifest_file, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def parse_chunk_markdown(content: str) -> dict:
+    """
+    Parse a chunk markdown file into structured data.
+
+    Args:
+        content: Raw markdown content with frontmatter and chunk delimiters
+
+    Returns:
+        Dict with source_file, metadata, params, total_chunks, chunks
+    """
+    import re
+
+    # Parse frontmatter
+    fm_pattern = r'^---\s*\n(.*?)\n---\s*\n(.*)$'
+    match = re.match(fm_pattern, content, re.DOTALL)
+
+    if not match:
+        raise ValueError("Invalid chunk file: missing frontmatter")
+
+    frontmatter_raw = match.group(1)
+    body = match.group(2)
+
+    # Parse frontmatter fields
+    frontmatter = {}
+    for line in frontmatter_raw.split('\n'):
+        line = line.strip()
+        if ':' in line:
+            key, value = line.split(':', 1)
+            key = key.strip()
+            value = value.strip().strip('"\'')
+            # Try to convert numbers
+            if value.isdigit():
+                value = int(value)
+            frontmatter[key] = value
+
+    # Extract known fields
+    source_file = frontmatter.pop('source_file', '')
+    chunk_size = frontmatter.pop('chunk_size', 256)
+    overlap = frontmatter.pop('overlap', 50)
+    total_chunks = frontmatter.pop('total_chunks', 0)
+
+    # Remaining frontmatter is original metadata
+    metadata = frontmatter
+
+    # Parse chunks from body using delimiter pattern
+    chunk_pattern = r'----- chunk (\d+) \((\d+) tokens\) -----\n\n(.*?)(?=\n\n----- chunk|\Z)'
+    chunk_matches = re.findall(chunk_pattern, body, re.DOTALL)
+
+    chunks = []
+    for idx_str, tokens_str, text in chunk_matches:
+        chunks.append({
+            "index": int(idx_str),
+            "token_count": int(tokens_str),
+            "text": text.strip(),
+        })
+
+    return {
+        "source_file": source_file,
+        "metadata": metadata,
+        "params": {"chunk_size": chunk_size, "overlap": overlap},
+        "total_chunks": total_chunks,
+        "chunks": chunks,
+    }
+
+
+def read_chunk_files(chunks_dir: Path) -> list[dict]:
+    """
+    Read all chunk markdown files from a directory.
+
+    Args:
+        chunks_dir: Directory containing chunk files
+
+    Returns:
+        List of chunk file data dicts, sorted by filename
+    """
+    chunk_files = sorted(chunks_dir.glob("*.chunks.md"))
+    results = []
+
+    for chunk_file in chunk_files:
+        with open(chunk_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        results.append(parse_chunk_markdown(content))
+
+    return results
+
 
 def ingest_file(
     file_path: Path,
     collection,
     base_dir: Path | None = None,
-    no_chunk: bool = False,
     chunk_size: int = 256,
     overlap: int = 50,
 ) -> int:
@@ -183,7 +408,6 @@ def ingest_file(
         file_path: Path to the markdown file
         collection: ChromaDB collection to add documents to
         base_dir: Base directory for computing relative paths
-        no_chunk: If True, ingest entire document as single chunk
         chunk_size: Maximum tokens per chunk (default: 256)
         overlap: Number of tokens to overlap between chunks (default: 50)
 
@@ -196,10 +420,7 @@ def ingest_file(
         print(f"  Skipping {file_path.name}: {e}")
         return 0
 
-    if no_chunk:
-        chunks = [content.strip()] if content.strip() else []
-    else:
-        chunks = chunk_by_tokens(content, chunk_size=chunk_size, overlap=overlap)
+    chunks = chunk_by_tokens(content, chunk_size=chunk_size, overlap=overlap)
 
     if not chunks:
         print(f"  Skipping {file_path.name}: no content")
@@ -276,7 +497,6 @@ def sanitize_collection_name(name: str) -> str:
 def ingest_directory(
     directory: str | Path,
     collection_name: str | None = None,
-    no_chunk: bool = False,
     chunk_size: int = 256,
     overlap: int = 50,
 ) -> dict:
@@ -291,7 +511,6 @@ def ingest_directory(
     Args:
         directory: Path to the directory containing markdown files
         collection_name: Name of the ChromaDB collection (default: auto-generated)
-        no_chunk: If True, ingest entire documents without chunking
         chunk_size: Maximum tokens per chunk (default: 256)
         overlap: Number of tokens to overlap between chunks (default: 50)
 
@@ -332,7 +551,6 @@ def ingest_directory(
             file_path,
             collection,
             base_dir=directory,
-            no_chunk=no_chunk,
             chunk_size=chunk_size,
             overlap=overlap,
         )
@@ -366,6 +584,208 @@ def ingest_directory(
     }
 
 
+# ==================== Two-Phase Chunking ====================
+
+
+def create_chunks_to_files(
+    directory: str | Path,
+    chunk_size: int = 256,
+    overlap: int = 50,
+) -> dict:
+    """
+    Create chunk files for inspection without ingesting to ChromaDB.
+
+    This is the "preview" phase of the two-phase chunking workflow.
+    Chunks are written to data/chunks/{corpus_name}/ for user inspection.
+
+    Args:
+        directory: Path to the directory containing markdown files
+        chunk_size: Maximum tokens per chunk (default: 256)
+        overlap: Number of tokens to overlap between chunks (default: 50)
+
+    Returns:
+        Dictionary with chunking statistics and chunks_dir path
+    """
+    directory = Path(directory)
+    corpus_name = sanitize_collection_name(directory.name)
+
+    if not directory.exists():
+        raise FileNotFoundError(f"Directory not found: {directory}")
+
+    # Clear and create chunks directory
+    chunks_dir = clear_chunks_dir(corpus_name)
+
+    # Find all markdown files
+    md_files = find_markdown_files(directory)
+
+    if not md_files:
+        print(f"No markdown files found in {directory}")
+        return {"files_processed": 0, "total_chunks": 0, "chunks_dir": str(chunks_dir)}
+
+    print(f"Found {len(md_files)} markdown file(s) in {directory}")
+    print()
+    print("Creating chunks...")
+
+    params = {"chunk_size": chunk_size, "overlap": overlap}
+    total_chunks = 0
+    total_tokens = 0
+    files_processed = 0
+
+    for file_index, file_path in enumerate(md_files):
+        try:
+            metadata, content = parse_markdown(file_path)
+        except ParseError as e:
+            print(f"  Skipping {file_path.name}: {e}")
+            continue
+
+        # Create chunks
+        text_chunks = chunk_by_tokens(content, chunk_size=chunk_size, overlap=overlap)
+
+        if not text_chunks:
+            print(f"  Skipping {file_path.name}: no content")
+            continue
+
+        # Build chunk data
+        chunks_data = []
+        for i, chunk_text in enumerate(text_chunks):
+            token_count = count_tokens(chunk_text)
+            total_tokens += token_count
+            chunks_data.append({
+                "index": i,
+                "token_count": token_count,
+                "text": chunk_text,
+            })
+
+        # Write chunk file
+        relative_path = str(file_path.relative_to(directory))
+        write_chunk_file(chunks_dir, file_index, relative_path, metadata, params, chunks_data)
+
+        total_chunks += len(chunks_data)
+        files_processed += 1
+        print(f"  {file_path.name} → {len(chunks_data)} chunks")
+
+    # Write manifest
+    stats = {
+        "total_files": files_processed,
+        "total_chunks": total_chunks,
+        "total_tokens": total_tokens,
+    }
+    write_manifest(chunks_dir, corpus_name, str(directory), params, stats)
+
+    return {
+        "files_processed": files_processed,
+        "total_chunks": total_chunks,
+        "total_tokens": total_tokens,
+        "chunks_dir": str(chunks_dir),
+        "corpus_name": corpus_name,
+    }
+
+
+def ingest_from_chunks(
+    chunks_dir: str | Path,
+    collection_name: str | None = None,
+) -> dict:
+    """
+    Ingest pre-created chunks from files into ChromaDB.
+
+    This is the "accept" phase of the two-phase chunking workflow.
+    Reads chunks from data/chunks/{corpus_name}/ and ingests to ChromaDB.
+
+    Args:
+        chunks_dir: Path to the chunks directory
+        collection_name: Name of the ChromaDB collection (default: from manifest)
+
+    Returns:
+        Dictionary with ingestion statistics
+    """
+    chunks_dir = Path(chunks_dir)
+
+    if not chunks_dir.exists():
+        raise FileNotFoundError(f"Chunks directory not found: {chunks_dir}")
+
+    # Read manifest
+    manifest = read_manifest(chunks_dir)
+    if not manifest:
+        raise ValueError(f"No manifest.json found in {chunks_dir}")
+
+    # Use collection name from manifest or generate one
+    if collection_name is None:
+        params = manifest["params"]
+        corpus_name = manifest["corpus_name"]
+        collection_name = f"{corpus_name}-{params['chunk_size']}chunk-{params['overlap']}overlap"
+
+    # Get the ChromaDB client and collection
+    RAG_DB_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    client = PersistentClient(path=str(RAG_DB_FILE_PATH))
+    collection = client.get_or_create_collection(name=collection_name)
+
+    # Read all chunk files
+    chunk_files = read_chunk_files(chunks_dir)
+
+    if not chunk_files:
+        print(f"No chunk files found in {chunks_dir}")
+        return {"files_processed": 0, "chunks_added": 0}
+
+    print(f"Ingesting {len(chunk_files)} file(s) to collection '{collection_name}'...")
+
+    total_chunks = 0
+
+    for file_data in chunk_files:
+        source_file = file_data["source_file"]
+        file_stem = Path(source_file).stem
+        metadata = file_data["metadata"]
+
+        ids = []
+        documents = []
+        metadatas = []
+
+        for chunk in file_data["chunks"]:
+            doc_id = f"{file_stem}_{chunk['index']}"
+            ids.append(doc_id)
+            documents.append(chunk["text"])
+
+            # Build metadata for ChromaDB
+            chunk_metadata = {
+                "source_file": source_file,
+                "chunk_index": chunk["index"],
+                "total_chunks": file_data["total_chunks"],
+            }
+            # Add all frontmatter fields
+            for key, value in metadata.items():
+                if isinstance(value, list):
+                    chunk_metadata[key] = ", ".join(str(v) for v in value)
+                else:
+                    chunk_metadata[key] = str(value)
+
+            metadatas.append(chunk_metadata)
+
+        collection.add(ids=ids, documents=documents, metadatas=metadatas)
+        total_chunks += len(ids)
+        print(f"  {source_file} → {len(ids)} chunks ingested")
+
+    total_in_collection = collection.count()
+
+    # Print summary
+    print()
+    print("=" * 50)
+    print("Ingestion Complete")
+    print("=" * 50)
+    print(f"  Collection:    {collection_name}")
+    print(f"  DB path:       {RAG_DB_FILE_PATH}")
+    print("-" * 50)
+    print(f"  Files:         {len(chunk_files)}")
+    print(f"  Chunks added:  {total_chunks}")
+    print(f"  Total in DB:   {total_in_collection}")
+    print("=" * 50)
+
+    return {
+        "files_processed": len(chunk_files),
+        "chunks_added": total_chunks,
+        "collection_name": collection_name,
+        "total_in_collection": total_in_collection,
+    }
+
+
 def prompt_with_default(prompt: str, default: str) -> str:
     """
     Prompt the user for input with a default value.
@@ -379,25 +799,6 @@ def prompt_with_default(prompt: str, default: str) -> str:
     """
     user_input = input(f"{prompt} [{default}]: ").strip()
     return user_input if user_input else default
-
-
-def prompt_yes_no(prompt: str, default: bool = False) -> bool:
-    """
-    Prompt the user for a yes/no input with a default value.
-
-    Args:
-        prompt: The prompt text to display
-        default: The default boolean value
-
-    Returns:
-        True for yes, False for no
-    """
-    default_str = "Y/n" if default else "y/N"
-    user_input = input(f"{prompt} [{default_str}]: ").strip().lower()
-
-    if not user_input:
-        return default
-    return user_input in ("y", "yes")
 
 
 def format_file_size(size_bytes: int) -> str:
@@ -448,25 +849,15 @@ def get_corpus_directories() -> list[Path]:
     return sorted([d for d in corpus_dir.iterdir() if d.is_dir()])
 
 
-def interactive_mode() -> dict:
+def select_directory() -> Path:
     """
-    Run interactive prompts to gather ingestion parameters.
-
-    Lists available corpus directories for easy selection, with an option
-    to enter a custom path.
+    Prompt user to select a corpus directory.
 
     Returns:
-        Dictionary with all ingestion parameters
+        Path to the selected directory
     """
-    print("=" * 50)
-    print("Markdown Ingestion - Interactive Mode")
-    print("=" * 50)
-    print("Press Enter to accept default values.\n")
-
-    # Get available corpus directories
     corpus_dirs = get_corpus_directories()
 
-    # Directory selection
     while True:
         if corpus_dirs:
             print("Available corpus directories:")
@@ -486,8 +877,7 @@ def interactive_mode() -> dict:
             try:
                 choice_num = int(choice)
                 if 1 <= choice_num <= len(corpus_dirs):
-                    dir_path = corpus_dirs[choice_num - 1]
-                    break
+                    return corpus_dirs[choice_num - 1]
                 elif choice_num == len(corpus_dirs) + 1:
                     # Fall through to custom path entry
                     pass
@@ -503,7 +893,7 @@ def interactive_mode() -> dict:
         if directory:
             dir_path = Path(directory).expanduser().resolve()
             if dir_path.exists() and dir_path.is_dir():
-                break
+                return dir_path
             print(f"  Error: '{directory}' is not a valid directory. Try again.\n")
         else:
             if not corpus_dirs:
@@ -511,9 +901,24 @@ def interactive_mode() -> dict:
             else:
                 print("  Error: Please enter a path.\n")
 
+
+def get_chunking_params(defaults: dict | None = None) -> dict:
+    """
+    Prompt user for chunking parameters.
+
+    Args:
+        defaults: Optional dict with default values for chunk_size and overlap
+
+    Returns:
+        Dict with chunk_size, overlap
+    """
+    defaults = defaults or {}
+    default_chunk_size = str(defaults.get("chunk_size", 256))
+    default_overlap = str(defaults.get("overlap", 50))
+
     # Chunk size
     while True:
-        chunk_size_str = prompt_with_default("Chunk size (tokens)", "256")
+        chunk_size_str = prompt_with_default("Chunk size (tokens)", default_chunk_size)
         try:
             chunk_size = int(chunk_size_str)
             if chunk_size > 0:
@@ -524,7 +929,7 @@ def interactive_mode() -> dict:
 
     # Overlap
     while True:
-        overlap_str = prompt_with_default("Overlap (tokens)", "50")
+        overlap_str = prompt_with_default("Overlap (tokens)", default_overlap)
         try:
             overlap = int(overlap_str)
             if overlap >= 0:
@@ -533,23 +938,93 @@ def interactive_mode() -> dict:
         except ValueError:
             print("  Error: Please enter a valid number.")
 
-    # No-chunk mode
-    no_chunk = prompt_yes_no("Disable chunking (ingest whole documents)", default=False)
-
-    # Collection name (auto-generate default based on directory)
-    folder_name = sanitize_collection_name(dir_path.name)
-    default_collection = f"{folder_name}-{chunk_size}chunk-{overlap}overlap"
-    collection_name = prompt_with_default("Collection name", default_collection)
-
-    print()  # Blank line before processing starts
-
     return {
-        "directory": str(dir_path),
-        "collection_name": collection_name,
-        "no_chunk": no_chunk,
         "chunk_size": chunk_size,
         "overlap": overlap,
     }
+
+
+def interactive_mode() -> dict | None:
+    """
+    Run two-phase interactive ingestion workflow.
+
+    Phase 1: Create chunks to files for inspection
+    Phase 2: User reviews and accepts or re-runs with different parameters
+
+    Returns:
+        Dictionary with ingestion results, or None if user quit
+    """
+    print("=" * 50)
+    print("Markdown Ingestion - Interactive Mode")
+    print("=" * 50)
+    print("Press Enter to accept default values.\n")
+
+    # Step 1: Select directory (only done once)
+    dir_path = select_directory()
+    print()
+
+    # Loop for chunking params (user can re-run with different params)
+    chunking_defaults = None
+
+    while True:
+        # Step 2: Get chunking parameters
+        params = get_chunking_params(chunking_defaults)
+        print()
+
+        # Step 3: Create chunks to files
+        result = create_chunks_to_files(
+            dir_path,
+            chunk_size=params["chunk_size"],
+            overlap=params["overlap"],
+        )
+
+        # Step 4: Show summary
+        print()
+        print("=" * 50)
+        print("Chunk Preview Summary")
+        print("=" * 50)
+        print(f"  Files processed:  {result['files_processed']}")
+        print(f"  Total chunks:     {result['total_chunks']}")
+        if result['total_chunks'] > 0:
+            avg_tokens = result['total_tokens'] // result['total_chunks']
+            print(f"  Avg tokens/chunk: {avg_tokens}")
+        print()
+        print(f"  Chunks written to: {result['chunks_dir']}")
+        print()
+
+        # Step 5: User decision
+        print("[A] Accept and ingest to ChromaDB")
+        print("[R] Re-run chunking with different parameters")
+        print("[Q] Quit (chunks preserved for later)")
+        print()
+
+        while True:
+            choice = input("Choice: ").strip().upper()
+            if choice in ("A", "R", "Q"):
+                break
+            print("  Please enter A, R, or Q.")
+
+        if choice == "Q":
+            print("\nChunks preserved. Run again to resume or modify.")
+            return None
+
+        if choice == "A":
+            # Step 6: Ingest to ChromaDB
+            print()
+
+            # Ask for collection name
+            corpus_name = result["corpus_name"]
+            default_collection = f"{corpus_name}-{params['chunk_size']}chunk-{params['overlap']}overlap"
+            collection_name = prompt_with_default("Collection name", default_collection)
+            print()
+
+            return ingest_from_chunks(result["chunks_dir"], collection_name=collection_name)
+
+        # choice == "R": Re-run with different params
+        print("\n" + "=" * 50)
+        print("Re-running chunking with new parameters...")
+        print("=" * 50 + "\n")
+        chunking_defaults = params  # Use previous values as defaults
 
 
 def main():
@@ -557,8 +1032,10 @@ def main():
     # If no arguments provided, run interactive mode
     if len(sys.argv) == 1:
         try:
-            params = interactive_mode()
-            ingest_directory(**params)
+            result = interactive_mode()
+            if result is None:
+                # User quit without ingesting
+                sys.exit(0)
         except KeyboardInterrupt:
             print("\n\nCancelled.")
             sys.exit(0)
@@ -579,11 +1056,6 @@ def main():
         help="ChromaDB collection name (default: {folder}-{chunk_size}chunk-{overlap}overlap)",
     )
     parser.add_argument(
-        "--no-chunk",
-        action="store_true",
-        help="Ingest entire documents without chunking",
-    )
-    parser.add_argument(
         "--chunk-size",
         type=int,
         default=256,
@@ -602,7 +1074,6 @@ def main():
         ingest_directory(
             args.directory,
             collection_name=args.collection_name,
-            no_chunk=args.no_chunk,
             chunk_size=args.chunk_size,
             overlap=args.overlap,
         )

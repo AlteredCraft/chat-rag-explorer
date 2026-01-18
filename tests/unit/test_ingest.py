@@ -7,8 +7,11 @@ Tests cover:
 - Token-based chunking
 - Collection name sanitization
 - Corpus directory listing (interactive mode)
+- Two-phase chunk file operations (write, read, manifest)
 - Error handling for malformed files
 """
+
+from pathlib import Path
 
 import pytest
 from unittest.mock import MagicMock
@@ -23,6 +26,14 @@ from utils.ingest import (
     get_corpus_directories,
     get_directory_stats,
     format_file_size,
+    clear_chunks_dir,
+    write_chunk_file,
+    write_manifest,
+    read_manifest,
+    read_chunk_files,
+    parse_chunk_markdown,
+    create_chunks_to_files,
+    CHUNKS_DIR,
     ParseError,
 )
 
@@ -288,20 +299,6 @@ Content here.
         assert metadata["source_file"] == "test.md"
         assert metadata["chunk_index"] == 0
 
-    def test_no_chunk_mode_single_document(self, tmp_path):
-        """With no_chunk=True, should ingest entire document as one chunk."""
-        md_file = tmp_path / "test.md"
-        content = " ".join(["word"] * 500)  # Long content
-        md_file.write_text(f"---\ntitle: Test\n---\n\n{content}")
-
-        mock_collection = MagicMock()
-
-        chunks_added = ingest_file(
-            md_file, mock_collection, base_dir=tmp_path, no_chunk=True
-        )
-
-        assert chunks_added == 1
-
     def test_skips_empty_content(self, tmp_path):
         """Should skip files with no content."""
         md_file = tmp_path / "empty.md"
@@ -504,3 +501,311 @@ class TestGetDirectoryStats:
 
         assert file_count == 0
         assert total_size == 0
+
+
+class TestClearChunksDir:
+    """Tests for clear_chunks_dir function."""
+
+    def test_creates_new_directory(self, tmp_path, monkeypatch):
+        """Should create chunks directory if it doesn't exist."""
+        import utils.ingest as ingest_module
+
+        monkeypatch.setattr(ingest_module, "CHUNKS_DIR", tmp_path / "chunks")
+
+        result = clear_chunks_dir("test-corpus")
+
+        assert result.exists()
+        assert result.is_dir()
+        assert result.name == "test-corpus"
+
+    def test_clobbers_existing_directory(self, tmp_path, monkeypatch):
+        """Should remove existing contents when clearing."""
+        import utils.ingest as ingest_module
+
+        chunks_base = tmp_path / "chunks"
+        chunks_base.mkdir()
+        corpus_dir = chunks_base / "test-corpus"
+        corpus_dir.mkdir()
+
+        # Create some existing files
+        (corpus_dir / "old_file.json").write_text("old content")
+        (corpus_dir / "subdir").mkdir()
+
+        monkeypatch.setattr(ingest_module, "CHUNKS_DIR", chunks_base)
+
+        result = clear_chunks_dir("test-corpus")
+
+        assert result.exists()
+        assert list(result.iterdir()) == []  # Directory should be empty
+
+
+class TestWriteChunkFile:
+    """Tests for write_chunk_file function."""
+
+    def test_writes_chunk_file_as_markdown(self, tmp_path):
+        """Should write chunk data as readable markdown with frontmatter."""
+        chunks_dir = tmp_path / "chunks"
+        chunks_dir.mkdir()
+
+        chunks = [
+            {"index": 0, "token_count": 100, "text": "First chunk"},
+            {"index": 1, "token_count": 95, "text": "Second chunk"},
+        ]
+        metadata = {"title": "Test Doc", "author": "Test Author"}
+        params = {"chunk_size": 256, "overlap": 50}
+
+        result = write_chunk_file(
+            chunks_dir,
+            file_index=0,
+            source_file="test.md",
+            metadata=metadata,
+            params=params,
+            chunks=chunks,
+        )
+
+        assert result.exists()
+        assert result.name == "00_test.chunks.md"
+
+        content = result.read_text()
+
+        # Check frontmatter
+        assert "---" in content
+        assert 'source_file: "test.md"' in content
+        assert "chunk_size: 256" in content
+        assert "overlap: 50" in content
+        assert "total_chunks: 2" in content
+        assert 'title: "Test Doc"' in content
+
+        # Check chunk delimiters
+        assert "----- chunk 0 (100 tokens) -----" in content
+        assert "----- chunk 1 (95 tokens) -----" in content
+        assert "First chunk" in content
+        assert "Second chunk" in content
+
+    def test_filename_includes_index_and_stem(self, tmp_path):
+        """Should create filename with index and source file stem."""
+        chunks_dir = tmp_path / "chunks"
+        chunks_dir.mkdir()
+
+        result = write_chunk_file(
+            chunks_dir,
+            file_index=5,
+            source_file="chapter_one.md",
+            metadata={},
+            params={"chunk_size": 256, "overlap": 50},
+            chunks=[{"index": 0, "token_count": 50, "text": "content"}],
+        )
+
+        assert result.name == "05_chapter_one.chunks.md"
+
+
+class TestWriteAndReadManifest:
+    """Tests for write_manifest and read_manifest functions."""
+
+    def test_roundtrip_manifest(self, tmp_path):
+        """Should write and read manifest correctly."""
+        chunks_dir = tmp_path / "chunks"
+        chunks_dir.mkdir()
+
+        params = {"chunk_size": 256, "overlap": 50}
+        stats = {"total_files": 10, "total_chunks": 150, "total_tokens": 35000}
+
+        write_manifest(
+            chunks_dir,
+            corpus_name="test-corpus",
+            source_dir="/path/to/source",
+            params=params,
+            stats=stats,
+        )
+
+        result = read_manifest(chunks_dir)
+
+        assert result["corpus_name"] == "test-corpus"
+        assert result["source_dir"] == "/path/to/source"
+        assert result["params"] == params
+        assert result["summary"] == stats
+        assert "created_at" in result
+
+    def test_read_missing_manifest_returns_none(self, tmp_path):
+        """Should return None if manifest doesn't exist."""
+        result = read_manifest(tmp_path)
+        assert result is None
+
+
+class TestReadChunkFiles:
+    """Tests for read_chunk_files function."""
+
+    def _write_chunk_md(self, path: Path, source_file: str, chunks: list[dict] = None):
+        """Helper to write a chunk markdown file for testing."""
+        chunks = chunks or []
+        lines = [
+            "---",
+            f'source_file: "{source_file}"',
+            "chunk_size: 256",
+            "overlap: 50",
+            f"total_chunks: {len(chunks)}",
+            "---",
+            "",
+        ]
+        for chunk in chunks:
+            lines.append(f"----- chunk {chunk['index']} ({chunk['token_count']} tokens) -----")
+            lines.append("")
+            lines.append(chunk["text"])
+            lines.append("")
+        path.write_text("\n".join(lines))
+
+    def test_reads_all_chunk_files_sorted(self, tmp_path):
+        """Should read all .chunks.md files in sorted order."""
+        chunks_dir = tmp_path / "chunks"
+        chunks_dir.mkdir()
+
+        # Create chunk files out of order
+        for i, name in [(2, "charlie"), (0, "alpha"), (1, "bravo")]:
+            self._write_chunk_md(
+                chunks_dir / f"{i:02d}_{name}.chunks.md",
+                f"{name}.md",
+            )
+
+        results = read_chunk_files(chunks_dir)
+
+        assert len(results) == 3
+        assert results[0]["source_file"] == "alpha.md"
+        assert results[1]["source_file"] == "bravo.md"
+        assert results[2]["source_file"] == "charlie.md"
+
+    def test_ignores_non_chunk_files(self, tmp_path):
+        """Should only read .chunks.md files."""
+        chunks_dir = tmp_path / "chunks"
+        chunks_dir.mkdir()
+
+        # Create a chunk file
+        self._write_chunk_md(
+            chunks_dir / "00_test.chunks.md",
+            "test.md",
+        )
+
+        # Create other files that should be ignored
+        (chunks_dir / "manifest.json").write_text("{}")
+        (chunks_dir / "notes.txt").write_text("notes")
+
+        results = read_chunk_files(chunks_dir)
+
+        assert len(results) == 1
+        assert results[0]["source_file"] == "test.md"
+
+
+class TestParseChunkMarkdown:
+    """Tests for parse_chunk_markdown function."""
+
+    def test_parses_frontmatter_and_chunks(self):
+        """Should parse markdown chunk file into structured data."""
+        content = '''---
+source_file: "test.md"
+chunk_size: 256
+overlap: 50
+total_chunks: 2
+title: "Test Doc"
+---
+
+----- chunk 0 (10 tokens) -----
+
+First chunk content.
+
+----- chunk 1 (15 tokens) -----
+
+Second chunk content.
+'''
+        result = parse_chunk_markdown(content)
+
+        assert result["source_file"] == "test.md"
+        assert result["params"]["chunk_size"] == 256
+        assert result["params"]["overlap"] == 50
+        assert result["total_chunks"] == 2
+        assert result["metadata"]["title"] == "Test Doc"
+        assert len(result["chunks"]) == 2
+        assert result["chunks"][0]["index"] == 0
+        assert result["chunks"][0]["token_count"] == 10
+        assert result["chunks"][0]["text"] == "First chunk content."
+        assert result["chunks"][1]["index"] == 1
+        assert result["chunks"][1]["token_count"] == 15
+        assert result["chunks"][1]["text"] == "Second chunk content."
+
+    def test_raises_on_missing_frontmatter(self):
+        """Should raise ValueError if frontmatter is missing."""
+        content = "No frontmatter here"
+        with pytest.raises(ValueError, match="missing frontmatter"):
+            parse_chunk_markdown(content)
+
+    def test_roundtrip_with_write_chunk_file(self, tmp_path):
+        """Should be able to read back what write_chunk_file produces."""
+        chunks_dir = tmp_path / "chunks"
+        chunks_dir.mkdir()
+
+        source_file = "doc.md"
+        metadata = {"title": "Test Document", "author": "Test Author"}
+        params = {"chunk_size": 256, "overlap": 50}
+        chunks = [
+            {"index": 0, "token_count": 100, "text": "First chunk text here."},
+            {"index": 1, "token_count": 120, "text": "Second chunk text here."},
+        ]
+
+        # Write using write_chunk_file
+        chunk_path = write_chunk_file(chunks_dir, 0, source_file, metadata, params, chunks)
+
+        # Read back and parse
+        content = chunk_path.read_text()
+        result = parse_chunk_markdown(content)
+
+        assert result["source_file"] == source_file
+        assert result["params"]["chunk_size"] == 256
+        assert result["params"]["overlap"] == 50
+        assert result["metadata"]["title"] == "Test Document"
+        assert result["metadata"]["author"] == "Test Author"
+        assert len(result["chunks"]) == 2
+        assert result["chunks"][0]["text"] == "First chunk text here."
+        assert result["chunks"][1]["text"] == "Second chunk text here."
+
+
+class TestCreateChunksToFiles:
+    """Tests for create_chunks_to_files function."""
+
+    def test_creates_chunks_and_manifest(self, tmp_path, monkeypatch):
+        """Should create chunk files and manifest for markdown directory."""
+        import utils.ingest as ingest_module
+
+        # Set up source directory
+        source_dir = tmp_path / "corpus" / "test-docs"
+        source_dir.mkdir(parents=True)
+
+        (source_dir / "doc1.md").write_text("""---
+title: "Document 1"
+---
+
+This is the content of document one.
+""")
+        (source_dir / "doc2.md").write_text("""---
+title: "Document 2"
+---
+
+This is the content of document two.
+""")
+
+        # Set up chunks directory
+        chunks_base = tmp_path / "chunks"
+        monkeypatch.setattr(ingest_module, "CHUNKS_DIR", chunks_base)
+
+        result = create_chunks_to_files(source_dir, chunk_size=256, overlap=50)
+
+        assert result["files_processed"] == 2
+        assert result["total_chunks"] >= 2  # At least 1 chunk per file
+        assert "chunks_dir" in result
+
+        # Verify manifest exists
+        chunks_dir = chunks_base / "test-docs"
+        manifest = read_manifest(chunks_dir)
+        assert manifest is not None
+        assert manifest["corpus_name"] == "test-docs"
+
+        # Verify chunk files exist
+        chunk_files = list(chunks_dir.glob("*.chunks.md"))
+        assert len(chunk_files) == 2
