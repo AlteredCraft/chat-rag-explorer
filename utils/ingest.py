@@ -400,6 +400,41 @@ def prompt_yes_no(prompt: str, default: bool = False) -> bool:
     return user_input in ("y", "yes")
 
 
+def format_file_size(size_bytes: int) -> str:
+    """
+    Format a file size in bytes to a human-readable string.
+
+    Args:
+        size_bytes: Size in bytes
+
+    Returns:
+        Formatted string like "1.5 MB" or "256 KB"
+    """
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+    else:
+        return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+
+
+def get_directory_stats(directory: Path) -> tuple[int, int]:
+    """
+    Get stats for a directory: markdown file count and total size.
+
+    Args:
+        directory: Path to the directory
+
+    Returns:
+        Tuple of (markdown_file_count, total_size_bytes)
+    """
+    md_files = list(directory.rglob("*.md"))
+    total_size = sum(f.stat().st_size for f in md_files)
+    return len(md_files), total_size
+
+
 def get_corpus_directories() -> list[Path]:
     """
     Get list of directories in data/corpus/.
@@ -436,7 +471,9 @@ def interactive_mode() -> dict:
         if corpus_dirs:
             print("Available corpus directories:")
             for i, d in enumerate(corpus_dirs, start=1):
-                print(f"  [{i}] {d.name}")
+                file_count, total_size = get_directory_stats(d)
+                size_str = format_file_size(total_size)
+                print(f"  [{i}] {d.name:<30} ({file_count} files, {size_str})")
             print(f"  [{len(corpus_dirs) + 1}] Enter a custom path")
             print()
 

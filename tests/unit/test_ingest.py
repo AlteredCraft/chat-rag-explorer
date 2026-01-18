@@ -21,6 +21,8 @@ from utils.ingest import (
     count_tokens,
     sanitize_collection_name,
     get_corpus_directories,
+    get_directory_stats,
+    format_file_size,
     ParseError,
 )
 
@@ -444,3 +446,61 @@ class TestGetCorpusDirectories:
 
         names = [d.name for d in result]
         assert names == ["alpha", "middle", "zebra"]
+
+
+class TestFormatFileSize:
+    """Tests for format_file_size function."""
+
+    @pytest.mark.parametrize(
+        "size_bytes,expected",
+        [
+            (0, "0 B"),
+            (512, "512 B"),
+            (1023, "1023 B"),
+            (1024, "1.0 KB"),
+            (1536, "1.5 KB"),
+            (1024 * 100, "100.0 KB"),
+            (1024 * 1024, "1.0 MB"),
+            (1024 * 1024 * 1.5, "1.5 MB"),
+            (1024 * 1024 * 1024, "1.0 GB"),
+        ],
+    )
+    def test_formats_sizes_correctly(self, size_bytes, expected):
+        """Should format various sizes to human-readable strings."""
+        assert format_file_size(int(size_bytes)) == expected
+
+
+class TestGetDirectoryStats:
+    """Tests for get_directory_stats function."""
+
+    def test_counts_markdown_files_and_size(self, tmp_path):
+        """Should count .md files and sum their sizes."""
+        # Create test markdown files
+        (tmp_path / "file1.md").write_text("Hello world")  # 11 bytes
+        (tmp_path / "file2.md").write_text("More content here")  # 17 bytes
+        (tmp_path / "ignored.txt").write_text("Not markdown")  # Should be ignored
+
+        file_count, total_size = get_directory_stats(tmp_path)
+
+        assert file_count == 2
+        assert total_size == 28  # 11 + 17
+
+    def test_counts_nested_files(self, tmp_path):
+        """Should recursively count files in subdirectories."""
+        subdir = tmp_path / "subdir"
+        subdir.mkdir()
+
+        (tmp_path / "root.md").write_text("Root file")  # 9 bytes
+        (subdir / "nested.md").write_text("Nested file")  # 11 bytes
+
+        file_count, total_size = get_directory_stats(tmp_path)
+
+        assert file_count == 2
+        assert total_size == 20
+
+    def test_empty_directory(self, tmp_path):
+        """Should return zeros for empty directory."""
+        file_count, total_size = get_directory_stats(tmp_path)
+
+        assert file_count == 0
+        assert total_size == 0
