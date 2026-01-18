@@ -1,4 +1,27 @@
-"""Markdown ingestion module for ChromaDB RAG system."""
+"""
+Markdown ingestion module for ChromaDB RAG system.
+
+This module demonstrates the key steps in building a RAG (Retrieval-Augmented
+Generation) pipeline: loading documents, chunking them into manageable pieces,
+and storing them in a vector database for semantic search.
+
+Key Concepts:
+- Document Chunking: LLMs have context limits, so we split documents into
+  smaller chunks. Overlapping chunks help preserve context at boundaries.
+- Token-Based Splitting: We count tokens (not characters) because embedding
+  models have token limits. Uses the same tokenizer as the embedding model.
+- Metadata Extraction: YAML frontmatter becomes searchable metadata in ChromaDB,
+  enabling filtered queries (e.g., "search only in chapter 3").
+- Vector Embeddings: ChromaDB automatically generates embeddings using its
+  default model (all-MiniLM-L6-v2) when documents are added.
+
+Typical Workflow:
+1. Prepare markdown files with optional YAML frontmatter
+2. Run this script to chunk and ingest into ChromaDB
+3. Query the collection using semantic search in your application
+
+See utils/README.md for usage examples.
+"""
 
 import argparse
 import sys
@@ -343,10 +366,122 @@ def ingest_directory(
     }
 
 
+def prompt_with_default(prompt: str, default: str) -> str:
+    """
+    Prompt the user for input with a default value.
+
+    Args:
+        prompt: The prompt text to display
+        default: The default value shown in brackets
+
+    Returns:
+        User input or default if empty
+    """
+    user_input = input(f"{prompt} [{default}]: ").strip()
+    return user_input if user_input else default
+
+
+def prompt_yes_no(prompt: str, default: bool = False) -> bool:
+    """
+    Prompt the user for a yes/no input with a default value.
+
+    Args:
+        prompt: The prompt text to display
+        default: The default boolean value
+
+    Returns:
+        True for yes, False for no
+    """
+    default_str = "Y/n" if default else "y/N"
+    user_input = input(f"{prompt} [{default_str}]: ").strip().lower()
+
+    if not user_input:
+        return default
+    return user_input in ("y", "yes")
+
+
+def interactive_mode() -> dict:
+    """
+    Run interactive prompts to gather ingestion parameters.
+
+    Returns:
+        Dictionary with all ingestion parameters
+    """
+    print("=" * 50)
+    print("Markdown Ingestion - Interactive Mode")
+    print("=" * 50)
+    print("Press Enter to accept default values.\n")
+
+    # Directory (required, no default)
+    while True:
+        directory = input("Directory containing markdown files: ").strip()
+        if directory:
+            dir_path = Path(directory).expanduser().resolve()
+            if dir_path.exists() and dir_path.is_dir():
+                break
+            print(f"  Error: '{directory}' is not a valid directory. Try again.")
+        else:
+            print("  Error: Directory is required. Try again.")
+
+    # Chunk size
+    while True:
+        chunk_size_str = prompt_with_default("Chunk size (tokens)", "256")
+        try:
+            chunk_size = int(chunk_size_str)
+            if chunk_size > 0:
+                break
+            print("  Error: Chunk size must be positive.")
+        except ValueError:
+            print("  Error: Please enter a valid number.")
+
+    # Overlap
+    while True:
+        overlap_str = prompt_with_default("Overlap (tokens)", "50")
+        try:
+            overlap = int(overlap_str)
+            if overlap >= 0:
+                break
+            print("  Error: Overlap cannot be negative.")
+        except ValueError:
+            print("  Error: Please enter a valid number.")
+
+    # No-chunk mode
+    no_chunk = prompt_yes_no("Disable chunking (ingest whole documents)", default=False)
+
+    # Collection name (auto-generate default based on directory)
+    folder_name = sanitize_collection_name(dir_path.name)
+    default_collection = f"{folder_name}-{chunk_size}chunk-{overlap}overlap"
+    collection_name = prompt_with_default("Collection name", default_collection)
+
+    print()  # Blank line before processing starts
+
+    return {
+        "directory": str(dir_path),
+        "collection_name": collection_name,
+        "no_chunk": no_chunk,
+        "chunk_size": chunk_size,
+        "overlap": overlap,
+    }
+
+
 def main():
     """CLI entry point for ingestion."""
+    # If no arguments provided, run interactive mode
+    if len(sys.argv) == 1:
+        try:
+            params = interactive_mode()
+            ingest_directory(**params)
+        except KeyboardInterrupt:
+            print("\n\nCancelled.")
+            sys.exit(0)
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+        return
+
+    # Otherwise, use argument parser
     parser = argparse.ArgumentParser(
-        description="Ingest markdown files into ChromaDB"
+        description="Ingest markdown files into ChromaDB. Run without arguments for interactive mode."
     )
     parser.add_argument("directory", help="Directory containing markdown files")
     parser.add_argument(

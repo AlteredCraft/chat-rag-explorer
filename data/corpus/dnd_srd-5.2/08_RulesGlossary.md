@@ -1,3 +1,10 @@
+---
+section_number: 8
+section_title: "Rules Glossary"
+title: "D&D System Reference Document 5.2"
+url: "https://www.dndbeyond.com/srd?srsltid=AfmBOoqon7lRhxCjLFF3PVS_VvwP8Gi6H_JWuJEeeYVw9F6_ZXJ5LCur"
+---
+
 # Rules Glossary
 
 ## Glossary Conventions

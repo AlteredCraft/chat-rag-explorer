@@ -1,3 +1,10 @@
+---
+section_number: 12
+section_title: "Monsters A–Z"
+title: "D&D System Reference Document 5.2"
+url: "https://www.dndbeyond.com/srd?srsltid=AfmBOoqon7lRhxCjLFF3PVS_VvwP8Gi6H_JWuJEeeYVw9F6_ZXJ5LCur"
+---
+
 # Monsters A–Z
 
 ## Aboleth

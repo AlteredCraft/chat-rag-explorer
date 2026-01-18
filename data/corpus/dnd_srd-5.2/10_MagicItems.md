@@ -1,3 +1,10 @@
+---
+section_number: 10
+section_title: "Magic Items"
+title: "D&D System Reference Document 5.2"
+url: "https://www.dndbeyond.com/srd?srsltid=AfmBOoqon7lRhxCjLFF3PVS_VvwP8Gi6H_JWuJEeeYVw9F6_ZXJ5LCur"
+---
+
 # Magic Items
 
 Magic items are gleaned from the hoards of felled monsters or discovered in long-lost vaults. Such items grant capabilities a character could rarely have otherwise, or they complement their owner's capabilities in wondrous ways.
