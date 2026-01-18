@@ -60,6 +60,12 @@ def find_markdown_files(directory: str | Path) -> list[Path]:
     return sorted(directory.rglob("*.md"))
 
 
+class ParseError(Exception):
+    """Raised when a markdown file cannot be parsed."""
+
+    pass
+
+
 def parse_markdown(file_path: Path) -> tuple[dict, str]:
     """
     Parse a markdown file and extract frontmatter and content.
@@ -69,24 +75,30 @@ def parse_markdown(file_path: Path) -> tuple[dict, str]:
 
     Returns:
         Tuple of (metadata dict, content string)
+
+    Raises:
+        ParseError: If the file cannot be parsed (e.g., malformed YAML frontmatter)
     """
-    post = frontmatter.load(str(file_path))
-    metadata = dict(post.metadata)
-    content = post.content
-    return metadata, content
+    try:
+        post = frontmatter.load(str(file_path))
+        metadata = dict(post.metadata)
+        content = post.content
+        return metadata, content
+    except Exception as e:
+        raise ParseError(f"Failed to parse {file_path}: {e}") from e
 
 
-def chunk_by_tokens(content: str, max_tokens: int = 256, stride: int = 50) -> list[str]:
+def chunk_by_tokens(content: str, chunk_size: int = 256, overlap: int = 50) -> list[str]:
     """
     Split content into chunks based on token count using a sliding window.
 
     Args:
         content: The content to chunk
-        max_tokens: Maximum tokens per chunk (default: 256 for all-MiniLM-L6-v2)
-        stride: Number of tokens to overlap between chunks (default: 50)
+        chunk_size: Maximum tokens per chunk (default: 256 for all-MiniLM-L6-v2)
+        overlap: Number of tokens to overlap between chunks (default: 50)
 
     Returns:
-        List of content chunks, each under max_tokens
+        List of content chunks, each under chunk_size
     """
     if not TOKENIZER:
         # Fallback: return entire content as one chunk
@@ -97,7 +109,7 @@ def chunk_by_tokens(content: str, max_tokens: int = 256, stride: int = 50) -> li
 
     # Create a chunking tokenizer with truncation enabled
     chunking_tokenizer = Tokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
-    chunking_tokenizer.enable_truncation(max_length=max_tokens, stride=stride, strategy="longest_first")
+    chunking_tokenizer.enable_truncation(max_length=chunk_size, stride=overlap, strategy="longest_first")
     chunking_tokenizer.no_padding()
 
     # Encode with overflowing tokens
@@ -138,6 +150,8 @@ def ingest_file(
     collection,
     base_dir: Path | None = None,
     no_chunk: bool = False,
+    chunk_size: int = 256,
+    overlap: int = 50,
 ) -> int:
     """
     Ingest a single markdown file into the collection.
@@ -147,16 +161,22 @@ def ingest_file(
         collection: ChromaDB collection to add documents to
         base_dir: Base directory for computing relative paths
         no_chunk: If True, ingest entire document as single chunk
+        chunk_size: Maximum tokens per chunk (default: 256)
+        overlap: Number of tokens to overlap between chunks (default: 50)
 
     Returns:
         Number of chunks added
     """
-    metadata, content = parse_markdown(file_path)
+    try:
+        metadata, content = parse_markdown(file_path)
+    except ParseError as e:
+        print(f"  Skipping {file_path.name}: {e}")
+        return 0
 
     if no_chunk:
         chunks = [content.strip()] if content.strip() else []
     else:
-        chunks = chunk_by_tokens(content)
+        chunks = chunk_by_tokens(content, chunk_size=chunk_size, overlap=overlap)
 
     if not chunks:
         print(f"  Skipping {file_path.name}: no content")
@@ -205,10 +225,37 @@ def ingest_file(
     return len(chunks)
 
 
+def sanitize_collection_name(name: str) -> str:
+    """
+    Sanitize a string for use as a ChromaDB collection name.
+
+    Converts to lowercase, replaces spaces/underscores with hyphens,
+    and removes any characters that aren't alphanumeric or hyphens.
+
+    Args:
+        name: The string to sanitize
+
+    Returns:
+        Sanitized string safe for collection names
+    """
+    import re
+
+    # Lowercase and replace spaces/underscores with hyphens
+    name = name.lower().replace(" ", "-").replace("_", "-")
+    # Keep only alphanumeric and hyphens
+    name = re.sub(r"[^a-z0-9-]", "", name)
+    # Collapse multiple hyphens
+    name = re.sub(r"-+", "-", name)
+    # Strip leading/trailing hyphens
+    return name.strip("-")
+
+
 def ingest_directory(
     directory: str | Path,
-    collection_name: str = "blog_posts",
+    collection_name: str | None = None,
     no_chunk: bool = False,
+    chunk_size: int = 256,
+    overlap: int = 50,
 ) -> dict:
     """
     Ingest all markdown files from a directory into ChromaDB.
@@ -220,13 +267,20 @@ def ingest_directory(
 
     Args:
         directory: Path to the directory containing markdown files
-        collection_name: Name of the ChromaDB collection to use
+        collection_name: Name of the ChromaDB collection (default: auto-generated)
         no_chunk: If True, ingest entire documents without chunking
+        chunk_size: Maximum tokens per chunk (default: 256)
+        overlap: Number of tokens to overlap between chunks (default: 50)
 
     Returns:
         Dictionary with ingestion statistics
     """
     directory = Path(directory)
+
+    # Generate default collection name if not provided
+    if collection_name is None:
+        folder_name = sanitize_collection_name(directory.name)
+        collection_name = f"{folder_name}-{chunk_size}chunk-{overlap}overlap"
 
     if not directory.exists():
         raise FileNotFoundError(f"Directory not found: {directory}")
@@ -252,22 +306,40 @@ def ingest_directory(
     for file_path in md_files:
         print(f"Processing: {file_path.name}")
         chunks_added = ingest_file(
-            file_path, collection, base_dir=directory, no_chunk=no_chunk
+            file_path,
+            collection,
+            base_dir=directory,
+            no_chunk=no_chunk,
+            chunk_size=chunk_size,
+            overlap=overlap,
         )
         total_chunks += chunks_added
         files_processed += 1
         print(f"  Added {chunks_added} chunk(s)")
 
-    print(f"\nIngestion complete!")
-    print(f"  Files processed: {files_processed}")
-    print(f"  Total chunks: {total_chunks}")
-    print(f"  Collection: {collection_name}")
-    print(f"  Total documents in collection: {collection.count()}")
+    total_in_collection = collection.count()
+
+    # Print summary
+    print()
+    print("=" * 50)
+    print("Ingestion Summary")
+    print("=" * 50)
+    print(f"  Source:        {directory}")
+    print(f"  Collection:    {collection_name}")
+    print(f"  DB path:       {RAG_DB_FILE_PATH}")
+    print(f"  Chunk size:    {chunk_size} tokens")
+    print(f"  Overlap:       {overlap} tokens")
+    print("-" * 50)
+    print(f"  Files:         {files_processed}")
+    print(f"  Chunks added:  {total_chunks}")
+    print(f"  Total in DB:   {total_in_collection}")
+    print("=" * 50)
 
     return {
         "files_processed": files_processed,
         "chunks_added": total_chunks,
         "collection_name": collection_name,
+        "total_in_collection": total_in_collection,
     }
 
 
@@ -280,13 +352,25 @@ def main():
     parser.add_argument(
         "collection_name",
         nargs="?",
-        default="blog_posts",
-        help="ChromaDB collection name (default: blog_posts)",
+        default=None,
+        help="ChromaDB collection name (default: {folder}-{chunk_size}chunk-{overlap}overlap)",
     )
     parser.add_argument(
         "--no-chunk",
         action="store_true",
         help="Ingest entire documents without chunking",
+    )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=256,
+        help="Maximum tokens per chunk (default: 256)",
+    )
+    parser.add_argument(
+        "--overlap",
+        type=int,
+        default=50,
+        help="Token overlap between chunks (default: 50)",
     )
 
     args = parser.parse_args()
@@ -296,6 +380,8 @@ def main():
             args.directory,
             collection_name=args.collection_name,
             no_chunk=args.no_chunk,
+            chunk_size=args.chunk_size,
+            overlap=args.overlap,
         )
     except FileNotFoundError as e:
         print(f"Error: {e}")

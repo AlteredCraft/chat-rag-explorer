@@ -1,5 +1,5 @@
 ---
-title: "The Other Half of "Artists Ship""
+title: 'The Other Half of "Artists Ship"'
 author: "Paul Graham"
 date: "November 2008"
 tags: ["essays"]
