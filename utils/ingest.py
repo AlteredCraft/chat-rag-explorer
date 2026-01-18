@@ -400,9 +400,25 @@ def prompt_yes_no(prompt: str, default: bool = False) -> bool:
     return user_input in ("y", "yes")
 
 
+def get_corpus_directories() -> list[Path]:
+    """
+    Get list of directories in data/corpus/.
+
+    Returns:
+        Sorted list of directory paths
+    """
+    corpus_dir = Path(__file__).parent.parent / "data" / "corpus"
+    if not corpus_dir.exists():
+        return []
+    return sorted([d for d in corpus_dir.iterdir() if d.is_dir()])
+
+
 def interactive_mode() -> dict:
     """
     Run interactive prompts to gather ingestion parameters.
+
+    Lists available corpus directories for easy selection, with an option
+    to enter a custom path.
 
     Returns:
         Dictionary with all ingestion parameters
@@ -412,16 +428,51 @@ def interactive_mode() -> dict:
     print("=" * 50)
     print("Press Enter to accept default values.\n")
 
-    # Directory (required, no default)
+    # Get available corpus directories
+    corpus_dirs = get_corpus_directories()
+
+    # Directory selection
     while True:
+        if corpus_dirs:
+            print("Available corpus directories:")
+            for i, d in enumerate(corpus_dirs, start=1):
+                print(f"  [{i}] {d.name}")
+            print(f"  [{len(corpus_dirs) + 1}] Enter a custom path")
+            print()
+
+            choice = input("Select directory: ").strip()
+
+            if not choice:
+                print("  Error: Selection is required. Try again.\n")
+                continue
+
+            try:
+                choice_num = int(choice)
+                if 1 <= choice_num <= len(corpus_dirs):
+                    dir_path = corpus_dirs[choice_num - 1]
+                    break
+                elif choice_num == len(corpus_dirs) + 1:
+                    # Fall through to custom path entry
+                    pass
+                else:
+                    print(f"  Error: Please enter a number between 1 and {len(corpus_dirs) + 1}.\n")
+                    continue
+            except ValueError:
+                print("  Error: Please enter a valid number.\n")
+                continue
+
+        # Custom path entry (either no corpus dirs or user chose custom)
         directory = input("Directory containing markdown files: ").strip()
         if directory:
             dir_path = Path(directory).expanduser().resolve()
             if dir_path.exists() and dir_path.is_dir():
                 break
-            print(f"  Error: '{directory}' is not a valid directory. Try again.")
+            print(f"  Error: '{directory}' is not a valid directory. Try again.\n")
         else:
-            print("  Error: Directory is required. Try again.")
+            if not corpus_dirs:
+                print("  Error: Directory is required. Try again.\n")
+            else:
+                print("  Error: Please enter a path.\n")
 
     # Chunk size
     while True:

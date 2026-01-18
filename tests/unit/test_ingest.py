@@ -5,6 +5,8 @@ Tests cover:
 - Markdown file discovery
 - Frontmatter parsing
 - Token-based chunking
+- Collection name sanitization
+- Corpus directory listing (interactive mode)
 - Error handling for malformed files
 """
 
@@ -18,6 +20,7 @@ from utils.ingest import (
     ingest_file,
     count_tokens,
     sanitize_collection_name,
+    get_corpus_directories,
     ParseError,
 )
 
@@ -370,3 +373,74 @@ Content here.
         metadata = call_kwargs["metadatas"][0]
 
         assert metadata["tags"] == "python, testing, rag"
+
+
+class TestGetCorpusDirectories:
+    """Tests for get_corpus_directories function."""
+
+    def test_returns_empty_when_corpus_dir_missing(self, tmp_path, monkeypatch):
+        """Should return empty list when data/corpus doesn't exist."""
+        # Point the function to a non-existent corpus dir
+        fake_ingest_path = tmp_path / "utils" / "ingest.py"
+        fake_ingest_path.parent.mkdir(parents=True)
+        fake_ingest_path.touch()
+
+        import utils.ingest as ingest_module
+
+        # Monkeypatch __file__ to point to our fake path
+        monkeypatch.setattr(ingest_module, "__file__", str(fake_ingest_path))
+
+        result = get_corpus_directories()
+
+        assert result == []
+
+    def test_returns_only_directories(self, tmp_path, monkeypatch):
+        """Should return directories only, not files."""
+        # Create fake corpus structure
+        corpus_dir = tmp_path / "data" / "corpus"
+        corpus_dir.mkdir(parents=True)
+
+        # Create directories
+        (corpus_dir / "dir_one").mkdir()
+        (corpus_dir / "dir_two").mkdir()
+
+        # Create a file (should be excluded)
+        (corpus_dir / "readme.txt").touch()
+
+        # Point function to our fake structure
+        fake_ingest_path = tmp_path / "utils" / "ingest.py"
+        fake_ingest_path.parent.mkdir(parents=True)
+        fake_ingest_path.touch()
+
+        import utils.ingest as ingest_module
+
+        monkeypatch.setattr(ingest_module, "__file__", str(fake_ingest_path))
+
+        result = get_corpus_directories()
+
+        assert len(result) == 2
+        assert all(d.is_dir() for d in result)
+        assert {d.name for d in result} == {"dir_one", "dir_two"}
+
+    def test_returns_sorted_directories(self, tmp_path, monkeypatch):
+        """Should return directories in sorted order."""
+        corpus_dir = tmp_path / "data" / "corpus"
+        corpus_dir.mkdir(parents=True)
+
+        # Create directories in non-alphabetical order
+        (corpus_dir / "zebra").mkdir()
+        (corpus_dir / "alpha").mkdir()
+        (corpus_dir / "middle").mkdir()
+
+        fake_ingest_path = tmp_path / "utils" / "ingest.py"
+        fake_ingest_path.parent.mkdir(parents=True)
+        fake_ingest_path.touch()
+
+        import utils.ingest as ingest_module
+
+        monkeypatch.setattr(ingest_module, "__file__", str(fake_ingest_path))
+
+        result = get_corpus_directories()
+
+        names = [d.name for d in result]
+        assert names == ["alpha", "middle", "zebra"]
