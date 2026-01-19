@@ -2,63 +2,6 @@
 
 Command-line utilities for preparing markdown content for the RAG system.
 
-## split.py
-
-Splits a single markdown file into multiple chapter files based on heading patterns.
-
-### Usage
-
-```bash
-uv run utils/split.py <input.md> [--out DIR] [--pattern PATTERN] [--fm key:value ...]
-```
-
-### Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `input` | Path to the markdown file to split | (required) |
-| `--out` | Output directory | `./data/{filename}/` |
-| `--pattern` | Heading pattern to split on | `##` |
-| `--fm` | Add frontmatter field (repeatable) | none |
-
-### Examples
-
-```bash
-# Split on ## headings (default)
-uv run utils/split.py book.md
-
-# Split on ### headings with custom output
-uv run utils/split.py book.md --pattern "###" --out ./chapters/
-
-# Add custom frontmatter to all chapters
-uv run utils/split.py book.md \
-  --fm title:"My Book" \
-  --fm author:"Jane Doe" \
-  --fm url:"https://example.com"
-```
-
-### Output
-
-Creates numbered markdown files with YAML frontmatter:
-
-```
-01_chapter_one.md
-02_chapter_two.md
-...
-```
-
-Each file includes:
-```yaml
----
-section_number: 1
-section_title: "Chapter One"
-title: "My Book"        # from --fm
-author: "Jane Doe"      # from --fm
----
-```
-
----
-
 ## ingest.py
 
 Ingests markdown files into ChromaDB for RAG retrieval. Uses a two-phase workflow
@@ -157,3 +100,60 @@ uv run utils/split.py "My Book.md" --pattern "##" \
 # 2. Ingest the chapters (interactive mode recommended)
 uv run utils/ingest.py
 ```
+
+## split.py
+
+Splits a single markdown file into multiple chapter files based on heading patterns.
+
+### Usage
+
+```bash
+uv run utils/split.py <input.md> [--out DIR] [--pattern PATTERN] [--fm key:value ...]
+```
+
+### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `input` | Path to the markdown file to split | (required) |
+| `--out` | Output directory | `./data/{filename}/` |
+| `--pattern` | Heading pattern to split on | `##` |
+| `--fm` | Add frontmatter field (repeatable) | none |
+
+### Examples
+
+```bash
+# Split on ## headings (default)
+uv run utils/split.py book.md
+
+# Split on ### headings with custom output
+uv run utils/split.py book.md --pattern "###" --out ./chapters/
+
+# Add custom frontmatter to all chapters
+uv run utils/split.py book.md \
+  --fm title:"My Book" \
+  --fm author:"Jane Doe" \
+  --fm url:"https://example.com"
+```
+
+### Output
+
+Creates numbered markdown files with YAML frontmatter:
+
+```
+01_chapter_one.md
+02_chapter_two.md
+...
+```
+
+Each file includes:
+```yaml
+---
+section_number: 1
+section_title: "Chapter One"
+title: "My Book"        # from --fm
+author: "Jane Doe"      # from --fm
+---
+```
+
+---
