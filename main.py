@@ -5,6 +5,7 @@ This module handles:
 - Flask application startup with debug mode
 - Automatic port discovery (tries ports 8000-8004 if one is busy)
 - Werkzeug reloader compatibility for hot-reloading during development
+- Environment validation (requires .env with OPENROUTER_API_KEY)
 
 Usage:
     uv run main.py
@@ -12,11 +13,46 @@ Usage:
 import logging
 import os
 import socket
+import sys
+from pathlib import Path
 
 from chat_rag_explorer import create_app, is_reloader_process
 from config import Config
 
 logger = logging.getLogger("chat_rag_explorer")
+
+
+def validate_environment() -> None:
+    """
+    Validate required environment configuration exists.
+
+    Checks:
+    - .env file exists in project root
+    - OPENROUTER_API_KEY is set and not empty
+
+    Exits with helpful error message if validation fails.
+    """
+    env_path = Path(__file__).parent / ".env"
+
+    if not env_path.exists():
+        print("\n❌ ERROR: .env file not found!", file=sys.stderr)
+        print("\nTo get started:", file=sys.stderr)
+        print("  1. Copy .env.example to .env:", file=sys.stderr)
+        print("     cp .env.example .env", file=sys.stderr)
+        print("  2. Add your OpenRouter API key to .env:", file=sys.stderr)
+        print("     OPENROUTER_API_KEY=your_api_key_here", file=sys.stderr)
+        print("\nGet an API key at: https://openrouter.ai/keys\n", file=sys.stderr)
+        sys.exit(1)
+
+    if not Config.OPENROUTER_API_KEY:
+        print("\n❌ ERROR: OPENROUTER_API_KEY is not set!", file=sys.stderr)
+        print("\nAdd your OpenRouter API key to .env:", file=sys.stderr)
+        print("  OPENROUTER_API_KEY=your_api_key_here", file=sys.stderr)
+        print("\nGet an API key at: https://openrouter.ai/keys\n", file=sys.stderr)
+        sys.exit(1)
+
+
+validate_environment()
 app = create_app()
 
 
