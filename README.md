@@ -58,6 +58,8 @@ To ingest your own documents for RAG retrieval, see the [utils/README.md](utils/
 
 The ingest tool writes human-readable chunk previews to `data/chunks/` so you can tune chunking parameters before committing to the vector database.
 
+> **Sample Data Included**: A pre-built ChromaDB with ~2,000 chunks from the D&D SRD 5.2 ships at `data/chroma_db_sample/`. To use it, configure your RAG settings to point to this path.
+
 ---
 
 # Learn More
@@ -87,7 +89,8 @@ chat-rag-explorer/
 ├── data/
 │   ├── corpus/                  # Source markdown documents
 │   ├── chunks/                  # Chunk previews for inspection (gitignored)
-│   └── chroma_db/               # ChromaDB vector store
+│   ├── chroma_db/               # Your ChromaDB vector store (gitignored)
+│   └── chroma_db_sample/        # Pre-built sample DB (D&D SRD 5.2)
 ├── prompts/                     # System prompt templates (markdown)
 ├── logs/                        # Application logs (gitignored)
 ├── tests/                       # Test suite
