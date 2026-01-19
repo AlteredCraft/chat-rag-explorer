@@ -49,6 +49,17 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 *   **Markdown Support**: Secure rendering using Marked.js and DOMPurify (works offline)
 *   **Clean UI**: Responsive interface built with vanilla HTML/CSS/JS
 
+## Content Preparation (RAG)
+
+To ingest your own documents for RAG retrieval, see the [utils/README.md](utils/README.md) for CLI tools:
+
+- **split.py** - Split large markdown files into chapters by heading pattern
+- **ingest.py** - Two-phase workflow: preview chunks → inspect → ingest to ChromaDB
+
+The ingest tool writes human-readable chunk previews to `data/chunks/` so you can tune chunking parameters before committing to the vector database.
+
+> **Sample Data Included**: A pre-built ChromaDB with ~2,000 chunks from the D&D SRD 5.2 ships at `data/chroma_db_sample/`. To use it, configure your RAG settings to point to this path.
+
 ---
 
 # Learn More
@@ -61,26 +72,33 @@ The sections below provide deeper insight into the application's architecture, t
 
 ```text
 chat-rag-explorer/
-├── chat_rag_explorer/       # Main package
-│   ├── static/              # CSS, JS, and local libraries
-│   │   ├── script.js        # Main chat interface logic
-│   │   ├── settings.js      # Settings page logic (model picker)
-│   │   ├── style.css        # Application styles
-│   │   ├── marked.min.js    # Markdown parser (offline)
-│   │   └── purify.min.js    # HTML sanitizer (offline)
-│   ├── templates/           # HTML templates
-│   │   ├── index.html       # Main chat interface
-│   │   └── settings.html    # Settings page (model selection)
-│   ├── __init__.py          # App factory
-│   ├── logging.py           # Centralized logging configuration
-│   ├── routes.py            # Web endpoints
-│   └── services.py          # LLM integration logic
-├── docs/
-│   └── adr/                 # Architecture Decision Records (ADRs)
-├── config.py                # Configuration settings (environment variable mapping)
-├── main.py                  # Application entry point
-├── pyproject.toml           # Dependencies and project metadata (uv)
-└── .env                     # Secrets and local overrides (gitignored)
+├── chat_rag_explorer/           # Main package
+│   ├── static/                  # CSS, JS, and local libraries
+│   ├── templates/               # HTML templates
+│   ├── __init__.py              # App factory
+│   ├── logging.py               # Centralized logging configuration
+│   ├── routes.py                # Web endpoints
+│   ├── services.py              # LLM integration logic
+│   ├── rag_config_service.py    # ChromaDB connection management
+│   ├── prompt_service.py        # System prompt CRUD operations
+│   └── chat_history_service.py  # Conversation logging to JSONL
+├── utils/                       # CLI utilities for content preparation
+│   ├── README.md                # Utility documentation
+│   ├── split.py                 # Split 1 page markdown into chapters
+│   └── ingest.py                # Ingest markdown into ChromaDB
+├── data/
+│   ├── corpus/                  # Source markdown documents
+│   ├── chunks/                  # Chunk previews for inspection (gitignored)
+│   ├── chroma_db/               # Your ChromaDB vector store (gitignored)
+│   └── chroma_db_sample/        # Pre-built sample DB (D&D SRD 5.2)
+├── prompts/                     # System prompt templates (markdown)
+├── logs/                        # Application logs (gitignored)
+├── tests/                       # Test suite
+├── config.py                    # Configuration settings (environment variable mapping)
+├── main.py                      # Application entry point
+├── pyproject.toml               # Dependencies and project metadata (uv)
+├── .env.example                 # Template for environment variables (.env)
+└── .env                         # Secrets and local overrides (gitignored)
 ```
 
 ### Design Patterns
@@ -88,10 +106,6 @@ chat-rag-explorer/
 *   **Modular Architecture**: Flask Blueprints and Application Factory pattern
 *   **Centralized Logging**: Request ID correlation and configurable log levels
 *   **Modern Python Tooling**: Uses `uv` for fast dependency management
-
-### Architectural Decisions
-
-This project maintains Architecture Decision Records (ADRs) in the `docs/adr/` directory. These documents explain *why* certain technologies and patterns were chosen - excellent resources for understanding the design rationale.
 
 ## Logging
 
@@ -174,7 +188,10 @@ uv run pytest -k "test_name"      # Run specific test by name
 *   [x] Conversation History (Multi-turn)
 *   [x] Metrics Sidebar (Token usage & Model info)
 *   [x] Settings Page with Model Selection
-*   [ ] **RAG Implementation**: Connect a vector database to query local documents
+*   [x] System Prompt Management
+*   [x] ChromaDB Integration (local/server/cloud modes)
+*   [x] Content Ingestion CLI (`utils/ingest.py`, `utils/split.py`)
+*   [ ] RAG Query Integration in Chat
 *   [ ] Further settings and metrics for Chat UI
 *   [ ] Chat History Persistence (Server-side)
 

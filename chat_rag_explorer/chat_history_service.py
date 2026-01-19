@@ -1,4 +1,22 @@
-"""Chat history logging service for recording LLM interactions."""
+"""
+Chat history logging service for recording LLM interactions.
+
+This module demonstrates how to persist chat conversations for later analysis.
+Each interaction is logged as a single JSON line (JSONL format), making it easy
+to process logs with standard Unix tools or load into analytics systems.
+
+Key Concepts:
+- JSONL Format: One complete JSON object per line, ideal for append-only logs
+- Thread Safety: Uses threading.Lock to safely write from concurrent requests
+- Dataclasses: Structured data with automatic serialization via asdict()
+- Schema Versioning: Each entry includes schema_version for future compatibility
+
+The logged data is useful for:
+- Debugging conversation flow and model responses
+- Analyzing token usage and response times
+- Training data collection (with user consent)
+- Audit trails for compliance requirements
+"""
 
 import json
 import logging
