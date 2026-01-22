@@ -6,7 +6,7 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 
 ## Prerequisites
 
-*   Python 3.13+
+*   Python 3.11+
 *   [uv](https://github.com/astral-sh/uv) (for package management)
 *   An [OpenRouter](https://openrouter.ai/) API Key
 
@@ -172,6 +172,16 @@ uv run pytest -v                  # Verbose output
 uv run pytest -x                  # Stop on first failure
 uv run pytest --cov               # Run with coverage report
 uv run pytest -k "test_name"      # Run specific test by name
+```
+
+### Multi-Version Testing
+
+Use [nox](https://nox.thea.codes/) to run tests across Python 3.11, 3.12, and 3.13:
+
+```bash
+nox                               # Run on all Python versions
+nox -s tests-3.12                 # Run on specific version
+nox -- -x                         # Pass args to pytest
 ```
 
 ### Test Philosophy
