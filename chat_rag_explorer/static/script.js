@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Prompt selection constants
     const PROMPT_STORAGE_KEY = 'chat-rag-selected-prompt';
     const DEFAULT_PROMPT = 'default_system_prompt';
-    let currentSystemPrompt = 'You are a helpful assistant.'; // Fallback
+    let currentSystemPrompt = 'You are a helpful assistant.'; // Fallback (full prompt loaded from API)
 
     // RAG toggle state
     const RAG_ENABLED_KEY = 'chat-rag-rag-enabled';

@@ -22,8 +22,12 @@ DEFAULT_PROMPT_ID = 'default_system_prompt'
 DEFAULT_PROMPT = {
     'id': DEFAULT_PROMPT_ID,
     'title': 'Helpful Assistant',
-    'description': 'A general-purpose helpful AI assistant',
-    'content': 'You are a helpful assistant.',
+    'description': 'A general-purpose helpful AI assistant with RAG support',
+    'content': '''You are a helpful assistant.
+
+When context from a knowledge base is provided (in <knowledge_base_context> tags), use it to inform your response. Prioritize information from the provided context when answering questions, but you may also use your general knowledge to provide helpful responses.
+
+If the context doesn't contain relevant information for the user's question, acknowledge this and provide the best response you can based on your general knowledge.''',
     'protected': True
 }
 
