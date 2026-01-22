@@ -34,6 +34,35 @@ def generate_request_id():
     return str(uuid.uuid4())[:8]
 
 
+def build_augmented_message(user_message, documents):
+    """
+    Augment a user message with retrieved RAG context using XML tags.
+
+    Wraps retrieved documents in <knowledge_base_context> and the user's
+    message in <original_user_message> for clear structure.
+
+    Args:
+        user_message: The original user message text
+        documents: List of retrieved document texts
+
+    Returns:
+        Augmented message string with context prepended in XML format
+    """
+    if not documents:
+        return user_message
+
+    context_parts = ["<knowledge_base_context>"]
+    for i, doc in enumerate(documents, 1):
+        context_parts.append(f'<document index="{i}">{doc}</document>')
+    context_parts.append("</knowledge_base_context>")
+    context_parts.append("")
+    context_parts.append("<original_user_message>")
+    context_parts.append(user_message)
+    context_parts.append("</original_user_message>")
+
+    return "\n".join(context_parts)
+
+
 @main_bp.route("/")
 def index():
     logger.debug("Serving index page")
@@ -218,6 +247,7 @@ def chat():
     model = data.get("model")
     temperature = data.get("temperature")
     top_p = data.get("top_p")
+    rag_enabled = data.get("rag_enabled", False)
 
     # Calculate total message content length for logging
     total_content_length = sum(len(m.get("content", "")) for m in messages)
@@ -225,7 +255,7 @@ def chat():
     logger.info(
         f"[{request_id}] POST /api/chat - Model: {model}, "
         f"Messages: {len(messages)}, Content length: {total_content_length} chars, "
-        f"temperature: {temperature}, top_p: {top_p}"
+        f"temperature: {temperature}, top_p: {top_p}, rag_enabled: {rag_enabled}"
     )
     logger.debug(f"[{request_id}] Message roles: {[m.get('role') for m in messages]}")
 
@@ -235,6 +265,48 @@ def chat():
 
     if not model:
         logger.warning(f"[{request_id}] POST /api/chat - No model specified, will use default")
+
+    # RAG context retrieval
+    rag_context = None
+    messages_for_llm = messages
+
+    if rag_enabled:
+        # Find the last user message to use as query
+        user_messages = [m for m in messages if m.get("role") == "user"]
+        if user_messages:
+            latest_user_msg = user_messages[-1]["content"]
+
+            # Query ChromaDB for relevant context
+            rag_result = rag_config_service.query_collection(
+                query_text=latest_user_msg,
+                request_id=request_id
+            )
+
+            if rag_result.get("success") and rag_result.get("documents"):
+                rag_context = rag_result
+                logger.info(
+                    f"[{request_id}] RAG retrieved {len(rag_result['documents'])} documents "
+                    f"from '{rag_result.get('collection')}'"
+                )
+
+                # Build augmented message with context
+                augmented_content = build_augmented_message(
+                    latest_user_msg,
+                    rag_result["documents"]
+                )
+
+                # Create modified messages array with augmented last user message
+                messages_for_llm = messages[:-1] + [
+                    {"role": "user", "content": augmented_content}
+                ]
+            else:
+                # RAG query returned no results or failed
+                if not rag_result.get("success"):
+                    logger.warning(
+                        f"[{request_id}] RAG query failed: {rag_result.get('message')}"
+                    )
+                else:
+                    logger.debug(f"[{request_id}] RAG query returned no documents")
 
     def stream_with_logging():
         """Wrapper to add logging and chat history around the stream."""
@@ -247,7 +319,7 @@ def chat():
         resolved_model = model
 
         try:
-            for chunk in chat_service.chat_stream(messages, model, temperature, top_p, request_id):
+            for chunk in chat_service.chat_stream(messages_for_llm, model, temperature, top_p, request_id):
                 # Track time to first content chunk
                 if ttfc_time is None and not chunk.startswith("__METADATA__") and not chunk.startswith("Error:"):
                     ttfc_time = time.time()
@@ -288,6 +360,18 @@ def chat():
             final_model = resolved_model or current_app.config.get("DEFAULT_MODEL", "unknown")
             response_content = "".join(accumulated_content)
 
+            # Build RAG metadata if context was used
+            rag_metadata = None
+            if rag_enabled:
+                rag_metadata = {
+                    "enabled": True,
+                    "documents_retrieved": len(rag_context["documents"]) if rag_context else 0,
+                    "collection": rag_context.get("collection") if rag_context else None,
+                    "documents": rag_context.get("documents", []) if rag_context else [],
+                    "distances": rag_context.get("distances", []) if rag_context else [],
+                    "ids": rag_context.get("ids", []) if rag_context else [],
+                }
+
             entry_data = {
                 "request_id": full_request_id,
                 "model": final_model,
@@ -295,7 +379,8 @@ def chat():
                     "temperature": temperature,
                     "top_p": top_p,
                 },
-                "messages": messages,
+                "messages": messages_for_llm,  # Send augmented messages for transparency
+                "messages_original": messages,  # Also include original for reference
                 "response": response_content,
                 "status": status,
                 "error": error_message,
@@ -305,6 +390,7 @@ def chat():
                     "ttfc_ms": round(ttfc_seconds * 1000, 2) if ttfc_seconds else None,
                 },
                 "chunks": chunk_count,
+                "rag": rag_metadata,
             }
 
             # Log to chat history
@@ -335,6 +421,18 @@ def chat():
             final_model = resolved_model or model or current_app.config.get("DEFAULT_MODEL", "unknown")
             response_content = "".join(accumulated_content)
 
+            # Build RAG metadata for error case
+            rag_metadata_err = None
+            if rag_enabled:
+                rag_metadata_err = {
+                    "enabled": True,
+                    "documents_retrieved": len(rag_context["documents"]) if rag_context else 0,
+                    "collection": rag_context.get("collection") if rag_context else None,
+                    "documents": rag_context.get("documents", []) if rag_context else [],
+                    "distances": rag_context.get("distances", []) if rag_context else [],
+                    "ids": rag_context.get("ids", []) if rag_context else [],
+                }
+
             entry_data = {
                 "request_id": full_request_id,
                 "model": final_model,
@@ -342,7 +440,8 @@ def chat():
                     "temperature": temperature,
                     "top_p": top_p,
                 },
-                "messages": messages,
+                "messages": messages_for_llm,
+                "messages_original": messages,
                 "response": response_content,
                 "status": "error",
                 "error": str(e),
@@ -352,6 +451,7 @@ def chat():
                     "ttfc_ms": round(ttfc_seconds * 1000, 2) if ttfc_seconds else None,
                 },
                 "chunks": chunk_count,
+                "rag": rag_metadata_err,
             }
 
             # Log failed interaction to chat history

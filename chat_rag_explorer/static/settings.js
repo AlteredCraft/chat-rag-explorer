@@ -63,10 +63,16 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
 
-    // Restore last active tab
-    const savedTab = localStorage.getItem(TAB_STORAGE_KEY);
-    if (savedTab && document.querySelector(`[data-tab="${savedTab}"]`)) {
-        switchTab(savedTab);
+    // Check for hash in URL (e.g., #rag) to switch to specific tab
+    const hashTab = window.location.hash.replace('#', '');
+    if (hashTab && document.querySelector(`[data-tab="${hashTab}"]`)) {
+        switchTab(hashTab);
+    } else {
+        // Restore last active tab from localStorage
+        const savedTab = localStorage.getItem(TAB_STORAGE_KEY);
+        if (savedTab && document.querySelector(`[data-tab="${savedTab}"]`)) {
+            switchTab(savedTab);
+        }
     }
 
     const modelSelect = document.getElementById('model-select');
@@ -602,6 +608,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const ragSaveBadge = document.querySelector('.save-btn-badge');
     const ragTestHint = document.getElementById('rag-test-hint');
 
+    // Retrieval settings elements
+    const ragRetrievalSettings = document.getElementById('rag-retrieval-settings');
+    const ragNResultsSlider = document.getElementById('rag-n-results-slider');
+    const ragNResultsValue = document.getElementById('rag-n-results-value');
+    const ragDistanceSlider = document.getElementById('rag-distance-slider');
+    const ragDistanceValue = document.getElementById('rag-distance-value');
+
     // Wizard step elements
     const wizardSteps = document.querySelectorAll('.wizard-step');
 
@@ -657,7 +670,44 @@ document.addEventListener('DOMContentLoaded', () => {
             ragTenantId.value = originalRagConfig.cloud_tenant || '';
             ragDatabase.value = originalRagConfig.cloud_database || '';
 
+            // Populate retrieval settings
+            ragNResultsSlider.value = originalRagConfig.n_results || 5;
+            ragNResultsValue.textContent = ragNResultsSlider.value;
+
+            const threshold = originalRagConfig.distance_threshold || 0;
+            ragDistanceSlider.value = threshold;
+            ragDistanceValue.textContent = threshold === 0 ? 'Off' : threshold.toFixed(1);
+
             toggleRagMode();
+
+            // If a collection was previously saved, restore the collection selector state
+            if (originalRagConfig.collection) {
+                // Add the saved collection as an option and select it
+                ragCollectionSelect.innerHTML = '<option value="">Select a collection...</option>';
+                const option = document.createElement('option');
+                option.value = originalRagConfig.collection;
+                option.textContent = originalRagConfig.collection;
+                ragCollectionSelect.appendChild(option);
+                ragCollectionSelect.value = originalRagConfig.collection;
+
+                // Show the collection section and hide the placeholder
+                ragCollectionSection.style.display = 'block';
+                if (ragCollectionPlaceholder) ragCollectionPlaceholder.style.display = 'none';
+
+                // Show retrieval settings
+                if (ragRetrievalSettings) ragRetrievalSettings.style.display = 'block';
+
+                // Show preview button
+                updateSampleButtonVisibility();
+
+                // Update wizard state to reflect configured state
+                updateWizardFromState();
+
+                SettingsLogger.info('Restored collection from config', { collection: originalRagConfig.collection });
+            }
+
+            // Reset save button state after all form population is complete
+            updateRagSaveButtonState();
 
             SettingsLogger.info('RAG config loaded', originalRagConfig);
         } catch (error) {
@@ -766,10 +816,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 html += '</div>';
                 ragTestResult.innerHTML = html;
 
-                // Populate and show collection selector (don't restore previous selection)
+                // Populate and show collection selector (restore previous selection if available)
                 availableCollections = data.collections || [];
-                populateCollectionSelect(availableCollections, false);
+                populateCollectionSelect(availableCollections, true);
                 ragCollectionSection.style.display = 'block';
+
+                // If collection was restored, show retrieval settings and sample button
+                if (ragCollectionSelect.value) {
+                    if (ragRetrievalSettings) ragRetrievalSettings.style.display = 'block';
+                    updateSampleButtonVisibility();
+                }
             } else {
                 ragTestResult.innerHTML = `
                     <div class="test-error">
@@ -814,6 +870,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getCurrentRagConfig() {
+        // Parse distance threshold - 0 means no filtering (null)
+        const distanceVal = parseFloat(ragDistanceSlider.value);
+        const distanceThreshold = distanceVal === 0 ? null : distanceVal;
+
         return {
             mode: getSelectedRagMode(),
             local_path: ragLocalPath.value.trim(),
@@ -821,7 +881,9 @@ document.addEventListener('DOMContentLoaded', () => {
             server_port: parseInt(ragServerPort.value) || 8000,
             cloud_tenant: ragTenantId.value.trim(),
             cloud_database: ragDatabase.value.trim(),
-            collection: ragCollectionSelect.value
+            collection: ragCollectionSelect.value,
+            n_results: parseInt(ragNResultsSlider.value) || 5,
+            distance_threshold: distanceThreshold
         };
     }
 
@@ -834,7 +896,9 @@ document.addEventListener('DOMContentLoaded', () => {
                current.server_port !== (originalRagConfig.server_port || 8000) ||
                current.cloud_tenant !== (originalRagConfig.cloud_tenant || '') ||
                current.cloud_database !== (originalRagConfig.cloud_database || '') ||
-               current.collection !== (originalRagConfig.collection || '');
+               current.collection !== (originalRagConfig.collection || '') ||
+               current.n_results !== (originalRagConfig.n_results || 5) ||
+               current.distance_threshold !== (originalRagConfig.distance_threshold || null);
     }
 
     function validateRagForm() {
@@ -870,6 +934,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const isConfigValid = validateRagForm();
         const hasCollection = ragCollectionSelect.value !== '';
         const hasTestedConnection = ragCollectionSection.style.display !== 'none';
+        const hasUnsavedChanges = hasRagConfigChanges();
 
         const completed = [];
         let active = 1;
@@ -890,6 +955,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (hasCollection) {
             completed.push(3);
             active = 4;
+        }
+
+        // Step 4: Save - complete if no unsaved changes (config is saved)
+        if (hasCollection && !hasUnsavedChanges) {
+            completed.push(4);
         }
 
         // Update step visuals
@@ -1137,7 +1207,27 @@ document.addEventListener('DOMContentLoaded', () => {
     ragCollectionSelect.addEventListener('change', () => {
         updateRagSaveButtonState();
         updateSampleButtonVisibility();
+        // Show/hide retrieval settings when collection is selected
+        if (ragRetrievalSettings) {
+            ragRetrievalSettings.style.display = ragCollectionSelect.value ? 'block' : 'none';
+        }
     });
+
+    // Retrieval settings slider event listeners
+    if (ragNResultsSlider) {
+        ragNResultsSlider.addEventListener('input', () => {
+            ragNResultsValue.textContent = ragNResultsSlider.value;
+            updateRagSaveButtonState();
+        });
+    }
+
+    if (ragDistanceSlider) {
+        ragDistanceSlider.addEventListener('input', () => {
+            const val = parseFloat(ragDistanceSlider.value);
+            ragDistanceValue.textContent = val === 0 ? 'Off' : val.toFixed(1);
+            updateRagSaveButtonState();
+        });
+    }
 
     ragTestBtn.addEventListener('click', testRagConnection);
     ragSaveBtn.addEventListener('click', saveRagConfig);

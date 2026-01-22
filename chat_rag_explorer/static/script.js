@@ -97,6 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const DEFAULT_PROMPT = 'default_system_prompt';
     let currentSystemPrompt = 'You are a helpful assistant.'; // Fallback
 
+    // RAG toggle state
+    const RAG_ENABLED_KEY = 'chat-rag-rag-enabled';
+    let ragEnabled = localStorage.getItem(RAG_ENABLED_KEY) === 'true';
+    let ragConfigured = false; // Updated on load
+
     // Session persistence keys (survives navigation, clears on tab close)
     const SESSION_HISTORY_KEY = 'chat-rag-conversation-history';
     const SESSION_METRICS_KEY = 'chat-rag-session-metrics';
@@ -204,6 +209,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         const contentDiv = appendMessage('bot', '', displayIndex);
                         const html = marked.parse(msg.content);
                         contentDiv.innerHTML = DOMPurify.sanitize(html);
+
+                        // Restore RAG context display if present in metadata
+                        const meta = messageMetadata[displayIndex];
+                        if (meta && meta.rag && meta.rag.documents_retrieved > 0) {
+                            const ragContainer = document.getElementById(`rag-context-${displayIndex}`);
+                            if (ragContainer) {
+                                ragContainer.innerHTML = renderRagContext(meta.rag);
+                            }
+                        }
+
                         displayIndex++;
                     }
                     // Skip system messages in UI (don't increment displayIndex)
@@ -308,6 +323,61 @@ document.addEventListener('DOMContentLoaded', () => {
             loadSystemPrompt();
         }
     });
+
+    // ==================== RAG Toggle ====================
+
+    const ragEnabledToggle = document.getElementById('rag-enabled-toggle');
+    const ragStatus = document.getElementById('rag-status');
+
+    /**
+     * Check if RAG is configured (collection selected) and update toggle state.
+     */
+    async function checkRagStatus() {
+        try {
+            const response = await fetch('/api/rag/config');
+            const data = await response.json();
+            const config = data.data;
+
+            ragConfigured = config.collection && config.collection.length > 0;
+
+            if (ragConfigured) {
+                ragStatus.textContent = config.collection;
+                ragStatus.classList.remove('not-configured');
+                ragStatus.classList.add('configured');
+                ragEnabledToggle.disabled = false;
+                ragEnabledToggle.checked = ragEnabled;
+            } else {
+                ragStatus.textContent = 'Not configured';
+                ragStatus.classList.remove('configured');
+                ragStatus.classList.add('not-configured');
+                ragEnabledToggle.disabled = true;
+                ragEnabledToggle.checked = false;
+                ragEnabled = false;
+            }
+
+            AppLogger.info('RAG status checked', {
+                configured: ragConfigured,
+                collection: config.collection,
+                enabled: ragEnabled
+            });
+        } catch (error) {
+            AppLogger.error('Failed to check RAG status', { error: error.message });
+            ragStatus.textContent = 'Error';
+            ragEnabledToggle.disabled = true;
+        }
+    }
+
+    // Handle RAG toggle changes
+    if (ragEnabledToggle) {
+        ragEnabledToggle.addEventListener('change', () => {
+            ragEnabled = ragEnabledToggle.checked;
+            localStorage.setItem(RAG_ENABLED_KEY, ragEnabled.toString());
+            AppLogger.info('RAG toggle changed', { enabled: ragEnabled });
+        });
+    }
+
+    // Check RAG status on load
+    checkRagStatus();
 
     // Display current model on load
     const currentModel = getCurrentModel();
@@ -429,7 +499,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Build request body with optional parameters
             const requestBody = {
                 messages: conversationHistory,
-                model: model
+                model: model,
+                rag_enabled: ragEnabled && ragConfigured
             };
 
             // Only include parameters if they're supported by the model
@@ -444,7 +515,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 contextLength: conversationHistory.length,
                 model: model,
                 temperature: requestBody.temperature,
-                top_p: requestBody.top_p
+                top_p: requestBody.top_p,
+                rag_enabled: requestBody.rag_enabled
             });
 
             const response = await fetch('/api/chat', {
@@ -572,6 +644,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Save assistant metadata (received from backend - DRY with chat-history.jsonl)
                     if (receivedMetadata) {
                         saveMessageMetadata(assistantMsgIndex, receivedMetadata);
+
+                        // Display RAG context if present
+                        if (receivedMetadata.rag && receivedMetadata.rag.documents_retrieved > 0) {
+                            updateMessageRagContext(assistantMsgIndex, receivedMetadata.rag);
+                        }
                     }
                 }
             }
@@ -651,6 +728,14 @@ document.addEventListener('DOMContentLoaded', () => {
         // Store message index for details lookup
         if (msgIndex !== null) {
             messageDiv.dataset.msgIndex = msgIndex;
+        }
+
+        // Add RAG context container for bot messages (populated after response)
+        if (role === 'bot' && msgIndex !== null) {
+            const ragContainer = document.createElement('div');
+            ragContainer.className = 'rag-context-container';
+            ragContainer.id = `rag-context-${msgIndex}`;
+            messageDiv.appendChild(ragContainer);
         }
 
         const contentDiv = document.createElement('div');
@@ -907,6 +992,41 @@ document.addEventListener('DOMContentLoaded', () => {
             content.classList.toggle('expanded');
         }
     };
+
+    // ==================== RAG Context Display ====================
+
+    /**
+     * Render RAG context as a simple label.
+     * Full document content is visible in "View Details" modal.
+     * @param {Object} ragData - RAG metadata from response
+     * @returns {string} HTML string for the RAG context label
+     */
+    function renderRagContext(ragData) {
+        if (!ragData || !ragData.documents || ragData.documents.length === 0) {
+            return '';
+        }
+
+        const docCount = ragData.documents.length;
+        const collection = escapeHtml(ragData.collection || 'knowledge base');
+
+        return `<div class="rag-context-label">Retrieved ${docCount} document(s) from <strong>${collection}</strong></div>`;
+    }
+
+    /**
+     * Update the RAG context container for a message.
+     * @param {number} msgIndex - Message index
+     * @param {Object} ragData - RAG metadata
+     */
+    function updateMessageRagContext(msgIndex, ragData) {
+        const container = document.getElementById(`rag-context-${msgIndex}`);
+        if (container && ragData && ragData.documents_retrieved > 0) {
+            container.innerHTML = renderRagContext(ragData);
+            AppLogger.debug('RAG context displayed', {
+                msgIndex,
+                documents: ragData.documents_retrieved
+            });
+        }
+    }
 
     AppLogger.info('Chat application initialized successfully', {
         sessionId: AppLogger.sessionId,

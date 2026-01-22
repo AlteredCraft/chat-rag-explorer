@@ -49,7 +49,19 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 *   **Markdown Support**: Secure rendering using Marked.js and DOMPurify (works offline)
 *   **Clean UI**: Responsive interface built with vanilla HTML/CSS/JS
 
-## Content Preparation (RAG)
+## RAG (Retrieval-Augmented Generation)
+
+RAG integration allows the chat to retrieve relevant documents from ChromaDB and inject them as context for the LLM. See [docs/RAG.md](docs/RAG.md) for detailed documentation.
+
+**Quick Start:**
+1. Go to Settings > RAG Settings
+2. Configure your ChromaDB connection (local, server, or cloud)
+3. Test connection and select a collection
+4. Enable RAG toggle in chat sidebar
+
+> **Sample Data Included**: A pre-built ChromaDB with ~2,000 chunks from the D&D SRD 5.2 ships at `data/chroma_db_sample/`.
+
+## Content Preparation
 
 To ingest your own documents for RAG retrieval, see the [utils/README.md](utils/README.md) for CLI tools:
 
@@ -57,8 +69,6 @@ To ingest your own documents for RAG retrieval, see the [utils/README.md](utils/
 - **ingest.py** - Two-phase workflow: preview chunks → inspect → ingest to ChromaDB
 
 The ingest tool writes human-readable chunk previews to `data/chunks/` so you can tune chunking parameters before committing to the vector database.
-
-> **Sample Data Included**: A pre-built ChromaDB with ~2,000 chunks from the D&D SRD 5.2 ships at `data/chroma_db_sample/`. To use it, configure your RAG settings to point to this path.
 
 ---
 
@@ -190,20 +200,6 @@ nox -- -x                         # Pass args to pytest
 *   External dependencies (ChromaDB, OpenRouter) are mocked
 *   Use `tmp_path` fixture for any file operations
 *   Tests run in random order to catch hidden state dependencies
-
-## Roadmap
-
-*   [x] Basic Chat Interface
-*   [x] LLM Streaming
-*   [x] Conversation History (Multi-turn)
-*   [x] Metrics Sidebar (Token usage & Model info)
-*   [x] Settings Page with Model Selection
-*   [x] System Prompt Management
-*   [x] ChromaDB Integration (local/server/cloud modes)
-*   [x] Content Ingestion CLI (`utils/ingest.py`, `utils/split.py`)
-*   [ ] RAG Query Integration in Chat
-*   [ ] Further settings and metrics for Chat UI
-*   [ ] Chat History Persistence (Server-side)
 
 ## License
 

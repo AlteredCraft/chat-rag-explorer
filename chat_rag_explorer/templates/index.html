@@ -38,10 +38,10 @@
 
             <aside class="sidebar">
                 <div class="sidebar-section">
-                    <div class="metric">
+                    <a href="/settings#model" class="metric metric-link">
                         <span class="label">Model:</span>
                         <span id="metric-model" class="value">-</span>
-                    </div>
+                    </a>
                 </div>
                 <div class="sidebar-section">
                     <h3>Last Interaction</h3>
@@ -138,6 +138,18 @@
                         </div>
                         <input type="range" id="top-p-slider" min="0" max="1" step="0.05" value="1.0">
                         <span class="param-hint" id="top-p-hint"></span>
+                    </div>
+                </div>
+                <div class="sidebar-section">
+                    <h3><a href="/settings#rag" class="section-link">RAG</a></h3>
+                    <div class="rag-toggle-container">
+                        <label class="rag-toggle">
+                            <input type="checkbox" id="rag-enabled-toggle" disabled>
+                            <span class="toggle-label">Enable RAG</span>
+                        </label>
+                        <a href="/settings#rag" id="rag-status" class="rag-status not-configured">
+                            Not configured
+                        </a>
                     </div>
                 </div>
             </aside>

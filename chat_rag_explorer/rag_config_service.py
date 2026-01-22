@@ -32,6 +32,8 @@ DEFAULT_RAG_CONFIG = {
     'cloud_tenant': '',        # Tenant ID for CloudClient
     'cloud_database': '',      # Database name for CloudClient
     'collection': '',          # Selected collection name
+    'n_results': 5,            # Number of documents to retrieve per query
+    'distance_threshold': None,  # Max distance filter (None = no filtering)
 }
 
 
@@ -101,6 +103,13 @@ class RagConfigService:
                 return {'error': 'Database name is required for cloud mode'}
 
         # Build config object
+        # Handle distance_threshold - convert to None if 0 or empty
+        distance_threshold = config_data.get('distance_threshold')
+        if distance_threshold is not None:
+            distance_threshold = float(distance_threshold) if distance_threshold else None
+            if distance_threshold == 0:
+                distance_threshold = None
+
         config = {
             'mode': mode,
             'local_path': config_data.get('local_path', ''),
@@ -109,6 +118,8 @@ class RagConfigService:
             'cloud_tenant': config_data.get('cloud_tenant', ''),
             'cloud_database': config_data.get('cloud_database', ''),
             'collection': config_data.get('collection', ''),
+            'n_results': int(config_data.get('n_results', 5)),
+            'distance_threshold': distance_threshold,
         }
 
         try:
@@ -347,6 +358,108 @@ class RagConfigService:
         except Exception as e:
             logger.error(f"{log_prefix}Failed to fetch sample records: {e}")
             return {'success': False, 'message': str(e)}
+
+    def query_collection(self, query_text, n_results=None, distance_threshold=None, request_id=None):
+        """
+        Query the configured ChromaDB collection for relevant documents.
+
+        Uses the collection's embedding function to convert query_text to a vector
+        and performs similarity search against stored documents.
+
+        Args:
+            query_text: The text to search for (typically the user's message)
+            n_results: Maximum number of results to return (default from config or 5)
+            distance_threshold: Maximum distance to filter results (default from config)
+                               Lower values = more relevant. None = no filtering.
+            request_id: Optional request ID for log correlation
+
+        Returns:
+            dict with:
+                - success: bool indicating if query succeeded
+                - documents: list of document texts (empty if no results)
+                - metadatas: list of metadata dicts
+                - distances: list of distance scores
+                - ids: list of document IDs
+                - collection: name of queried collection
+                - message: error message if not successful
+        """
+        log_prefix = f"[{request_id}] " if request_id else ""
+
+        # Load current config
+        config = self.get_config(request_id)
+        collection_name = config.get('collection')
+
+        if not collection_name:
+            logger.debug(f"{log_prefix}RAG query skipped: no collection configured")
+            return {
+                'success': False,
+                'message': 'No collection configured',
+                'documents': [],
+                'metadatas': [],
+                'distances': [],
+                'ids': []
+            }
+
+        # Use config defaults if not provided
+        if n_results is None:
+            n_results = config.get('n_results', 5)
+        if distance_threshold is None:
+            distance_threshold = config.get('distance_threshold')
+
+        try:
+            client = self._create_client(config, request_id)
+            collection = client.get_collection(collection_name)
+
+            # Query the collection
+            results = collection.query(
+                query_texts=[query_text],
+                n_results=n_results,
+                include=['documents', 'metadatas', 'distances']
+            )
+
+            # Extract results (query returns nested lists for batch queries)
+            ids = results.get('ids', [[]])[0]
+            documents = results.get('documents', [[]])[0]
+            metadatas = results.get('metadatas', [[]])[0]
+            distances = results.get('distances', [[]])[0]
+
+            # Filter by distance threshold if provided
+            if distance_threshold is not None:
+                filtered = [
+                    (doc_id, doc, meta, dist)
+                    for doc_id, doc, meta, dist in zip(ids, documents, metadatas, distances)
+                    if dist <= distance_threshold
+                ]
+                if filtered:
+                    ids, documents, metadatas, distances = zip(*filtered)
+                    ids, documents, metadatas, distances = list(ids), list(documents), list(metadatas), list(distances)
+                else:
+                    ids, documents, metadatas, distances = [], [], [], []
+
+            logger.info(
+                f"{log_prefix}RAG query returned {len(documents)} documents "
+                f"from '{collection_name}' (threshold: {distance_threshold})"
+            )
+
+            return {
+                'success': True,
+                'collection': collection_name,
+                'documents': documents,
+                'metadatas': metadatas,
+                'distances': distances,
+                'ids': ids
+            }
+
+        except Exception as e:
+            logger.error(f"{log_prefix}RAG query failed: {e}")
+            return {
+                'success': False,
+                'message': str(e),
+                'documents': [],
+                'metadatas': [],
+                'distances': [],
+                'ids': []
+            }
 
 
 # Singleton instance

@@ -380,3 +380,146 @@ class TestTestConnection:
 
         assert result["success"] is False
         assert "unknown" in result["message"].lower()
+
+
+class TestQueryCollection:
+    """Tests for query_collection() method."""
+
+    def test_no_collection_configured(self, tmp_path, monkeypatch):
+        """Returns error when no collection is configured."""
+        service = RagConfigService()
+        config_path = tmp_path / "rag_config.json"
+        config_path.write_text(json.dumps({
+            "mode": "local",
+            "local_path": str(tmp_path),
+            "collection": ""
+        }))
+        monkeypatch.setattr(service, "_get_config_path", lambda: config_path)
+
+        result = service.query_collection("test query")
+
+        assert result["success"] is False
+        assert "no collection" in result["message"].lower()
+        assert result["documents"] == []
+
+    @patch("chat_rag_explorer.rag_config_service.chromadb.PersistentClient")
+    def test_successful_query(self, mock_client_class, tmp_path, monkeypatch):
+        """Returns documents on successful query."""
+        service = RagConfigService()
+        config_path = tmp_path / "rag_config.json"
+        (tmp_path / "chroma.sqlite3").write_text("fake")
+        config_path.write_text(json.dumps({
+            "mode": "local",
+            "local_path": str(tmp_path),
+            "collection": "test_collection",
+            "n_results": 5
+        }))
+        monkeypatch.setattr(service, "_get_config_path", lambda: config_path)
+
+        mock_collection = MagicMock()
+        mock_collection.query.return_value = {
+            "ids": [["id1", "id2"]],
+            "documents": [["doc content 1", "doc content 2"]],
+            "metadatas": [[{"source": "a"}, {"source": "b"}]],
+            "distances": [[0.5, 0.8]]
+        }
+        mock_client = MagicMock()
+        mock_client.get_collection.return_value = mock_collection
+        mock_client_class.return_value = mock_client
+
+        result = service.query_collection("test query", n_results=2)
+
+        assert result["success"] is True
+        assert len(result["documents"]) == 2
+        assert result["documents"][0] == "doc content 1"
+        assert result["distances"][0] == 0.5
+        assert result["collection"] == "test_collection"
+
+    @patch("chat_rag_explorer.rag_config_service.chromadb.PersistentClient")
+    def test_distance_threshold_filtering(self, mock_client_class, tmp_path, monkeypatch):
+        """Documents above threshold are filtered out."""
+        service = RagConfigService()
+        config_path = tmp_path / "rag_config.json"
+        (tmp_path / "chroma.sqlite3").write_text("fake")
+        config_path.write_text(json.dumps({
+            "mode": "local",
+            "local_path": str(tmp_path),
+            "collection": "test_collection"
+        }))
+        monkeypatch.setattr(service, "_get_config_path", lambda: config_path)
+
+        mock_collection = MagicMock()
+        mock_collection.query.return_value = {
+            "ids": [["id1", "id2", "id3"]],
+            "documents": [["close doc", "medium doc", "far doc"]],
+            "metadatas": [[{}, {}, {}]],
+            "distances": [[0.3, 0.7, 1.5]]
+        }
+        mock_client = MagicMock()
+        mock_client.get_collection.return_value = mock_collection
+        mock_client_class.return_value = mock_client
+
+        result = service.query_collection("test query", distance_threshold=1.0)
+
+        assert result["success"] is True
+        # Only docs with distance <= 1.0 should be included
+        assert len(result["documents"]) == 2
+        assert "far doc" not in result["documents"]
+
+    @patch("chat_rag_explorer.rag_config_service.chromadb.PersistentClient")
+    def test_query_failure_returns_error(self, mock_client_class, tmp_path, monkeypatch):
+        """Query failure returns error with empty lists."""
+        service = RagConfigService()
+        config_path = tmp_path / "rag_config.json"
+        (tmp_path / "chroma.sqlite3").write_text("fake")
+        config_path.write_text(json.dumps({
+            "mode": "local",
+            "local_path": str(tmp_path),
+            "collection": "test_collection"
+        }))
+        monkeypatch.setattr(service, "_get_config_path", lambda: config_path)
+
+        mock_client_class.side_effect = Exception("Connection failed")
+
+        result = service.query_collection("test query")
+
+        assert result["success"] is False
+        assert "connection failed" in result["message"].lower()
+        assert result["documents"] == []
+
+    @patch("chat_rag_explorer.rag_config_service.chromadb.PersistentClient")
+    def test_uses_config_defaults(self, mock_client_class, tmp_path, monkeypatch):
+        """Uses n_results and distance_threshold from config when not provided."""
+        service = RagConfigService()
+        config_path = tmp_path / "rag_config.json"
+        (tmp_path / "chroma.sqlite3").write_text("fake")
+        config_path.write_text(json.dumps({
+            "mode": "local",
+            "local_path": str(tmp_path),
+            "collection": "test_collection",
+            "n_results": 3,
+            "distance_threshold": 0.5
+        }))
+        monkeypatch.setattr(service, "_get_config_path", lambda: config_path)
+
+        mock_collection = MagicMock()
+        mock_collection.query.return_value = {
+            "ids": [["id1", "id2"]],
+            "documents": [["doc1", "doc2"]],
+            "metadatas": [[{}, {}]],
+            "distances": [[0.2, 0.8]]  # Only first should pass 0.5 threshold
+        }
+        mock_client = MagicMock()
+        mock_client.get_collection.return_value = mock_collection
+        mock_client_class.return_value = mock_client
+
+        result = service.query_collection("test query")
+
+        # Should use n_results=3 from config
+        mock_collection.query.assert_called_once()
+        call_kwargs = mock_collection.query.call_args[1]
+        assert call_kwargs["n_results"] == 3
+
+        # Should filter by distance_threshold=0.5 from config
+        assert len(result["documents"]) == 1
+        assert result["documents"][0] == "doc1"
