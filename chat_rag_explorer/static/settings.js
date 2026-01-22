@@ -597,6 +597,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const ragSampleSection = document.getElementById('rag-sample-section');
     const ragSampleCount = document.getElementById('rag-sample-count');
     const ragSampleRecords = document.getElementById('rag-sample-records');
+    const ragCollectionPlaceholder = document.getElementById('rag-collection-placeholder');
+    const ragSaveStatus = document.getElementById('rag-save-status');
+    const ragSaveBadge = document.querySelector('.save-btn-badge');
+    const ragTestHint = document.getElementById('rag-test-hint');
+
+    // Wizard step elements
+    const wizardSteps = document.querySelectorAll('.wizard-step');
 
     let originalRagConfig = null;
     let pathValidateTimeout = null;
@@ -615,7 +622,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Hide collection section when switching modes (connection needs to be re-tested)
         ragCollectionSection.style.display = 'none';
+        if (ragCollectionPlaceholder) ragCollectionPlaceholder.style.display = 'flex';
         ragTestResult.innerHTML = '';
+        if (ragTestHint) ragTestHint.style.display = 'inline';
+
+        // Clear validation errors when switching modes
+        [ragLocalPath, ragServerHost, ragServerPort, ragTenantId, ragDatabase].forEach(clearFieldValidation);
 
         // Load API key status when switching to cloud mode
         if (mode === 'cloud') {
@@ -705,10 +717,31 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function testRagConnection() {
+        // Validate required fields first
+        const mode = getSelectedRagMode();
+        let isValid = true;
+
+        if (mode === 'local') {
+            isValid = validateRequiredField(ragLocalPath, 'ChromaDB path is required');
+        } else if (mode === 'server') {
+            isValid = validateRequiredField(ragServerHost, 'Host is required') && isValid;
+            isValid = validateRequiredField(ragServerPort, 'Port is required') && isValid;
+        } else if (mode === 'cloud') {
+            isValid = validateRequiredField(ragTenantId, 'Tenant ID is required') && isValid;
+            isValid = validateRequiredField(ragDatabase, 'Database name is required') && isValid;
+        }
+
+        if (!isValid) {
+            ragTestResult.innerHTML = '<div class="test-error"><strong>Please fill in all required fields</strong></div>';
+            return;
+        }
+
         ragTestBtn.disabled = true;
-        ragTestBtn.textContent = 'Testing...';
+        ragTestBtn.innerHTML = '<span class="btn-icon">&#x21BB;</span> Testing...';
         ragTestResult.innerHTML = '<div class="testing">Testing connection...</div>';
+        if (ragTestHint) ragTestHint.style.display = 'none';
         ragCollectionSection.style.display = 'none';
+        if (ragCollectionPlaceholder) ragCollectionPlaceholder.style.display = 'none';
 
         const config = getCurrentRagConfig();
 
@@ -754,7 +787,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ragCollectionSection.style.display = 'none';
         } finally {
             ragTestBtn.disabled = false;
-            ragTestBtn.textContent = 'Test Connection';
+            ragTestBtn.innerHTML = '<span class="btn-icon">&#x2192;</span> Test Connection';
+            updateWizardFromState();
         }
     }
 
@@ -815,15 +849,112 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     }
 
+    // ===== Wizard Step Management =====
+
+    function updateWizardSteps(completedSteps = [], activeStep = 1) {
+        wizardSteps.forEach(step => {
+            const stepNum = parseInt(step.dataset.step);
+            step.classList.remove('step-complete', 'step-active', 'step-disabled');
+
+            if (completedSteps.includes(stepNum)) {
+                step.classList.add('step-complete');
+            } else if (stepNum === activeStep) {
+                step.classList.add('step-active');
+            } else if (stepNum > activeStep && !completedSteps.includes(stepNum)) {
+                step.classList.add('step-disabled');
+            }
+        });
+    }
+
+    function updateWizardFromState() {
+        const isConfigValid = validateRagForm();
+        const hasCollection = ragCollectionSelect.value !== '';
+        const hasTestedConnection = ragCollectionSection.style.display !== 'none';
+
+        const completed = [];
+        let active = 1;
+
+        // Step 1: Configure - complete if form is valid
+        if (isConfigValid) {
+            completed.push(1);
+            active = 2;
+        }
+
+        // Step 2: Test - complete if connection was tested successfully
+        if (hasTestedConnection) {
+            completed.push(2);
+            active = 3;
+        }
+
+        // Step 3: Select Collection - complete if collection is selected
+        if (hasCollection) {
+            completed.push(3);
+            active = 4;
+        }
+
+        // Update step visuals
+        updateWizardSteps(completed, active);
+
+        // Toggle collection section visibility
+        if (ragCollectionPlaceholder && ragCollectionSection) {
+            ragCollectionPlaceholder.style.display = hasTestedConnection ? 'none' : 'flex';
+            ragCollectionSection.style.display = hasTestedConnection ? 'block' : 'none';
+        }
+    }
+
+    // ===== Inline Validation =====
+
+    function validateRequiredField(input, errorMessage = 'This field is required') {
+        const value = input.value.trim();
+        const isValid = value.length > 0;
+
+        input.classList.toggle('input-error', !isValid);
+
+        // Find or create validation message element
+        let validationMsg = input.parentElement.querySelector('.validation-message');
+        if (!validationMsg) {
+            validationMsg = document.createElement('div');
+            validationMsg.className = 'validation-message';
+            input.parentElement.appendChild(validationMsg);
+        }
+
+        if (!isValid) {
+            validationMsg.textContent = errorMessage;
+            validationMsg.style.display = 'block';
+        } else {
+            validationMsg.style.display = 'none';
+        }
+
+        return isValid;
+    }
+
+    function clearFieldValidation(input) {
+        input.classList.remove('input-error');
+        const validationMsg = input.parentElement.querySelector('.validation-message');
+        if (validationMsg) {
+            validationMsg.style.display = 'none';
+        }
+    }
+
     function updateRagSaveButtonState() {
         const hasChanges = hasRagConfigChanges();
         const isValid = validateRagForm();
         ragSaveBtn.disabled = !hasChanges || !isValid;
+
+        // Update badge visibility and button state for unsaved changes
+        if (ragSaveBadge) {
+            ragSaveBadge.style.display = hasChanges ? 'inline-block' : 'none';
+        }
+        ragSaveBtn.classList.toggle('has-changes', hasChanges && isValid);
+
+        // Update wizard steps
+        updateWizardFromState();
     }
 
     async function saveRagConfig() {
         ragSaveBtn.disabled = true;
-        ragSaveBtn.textContent = 'Saving...';
+        const saveText = ragSaveBtn.querySelector('.save-btn-text');
+        if (saveText) saveText.textContent = 'Saving...';
 
         const config = getCurrentRagConfig();
 
@@ -849,8 +980,19 @@ document.addEventListener('DOMContentLoaded', () => {
             SettingsLogger.error('Failed to save RAG config', { error: error.message });
             alert('Failed to save: ' + error.message);
         } finally {
-            ragSaveBtn.textContent = 'Save Settings';
+            const saveText = ragSaveBtn.querySelector('.save-btn-text');
+            if (saveText) saveText.textContent = 'Save Settings';
             updateRagSaveButtonState();
+
+            // Show save status message
+            if (ragSaveStatus) {
+                ragSaveStatus.textContent = 'Saved!';
+                ragSaveStatus.className = 'save-status save-status-success';
+                setTimeout(() => {
+                    ragSaveStatus.textContent = '';
+                    ragSaveStatus.className = 'save-status';
+                }, 2000);
+            }
         }
     }
 
@@ -871,6 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ragSampleBtn.disabled = true;
         ragSampleBtn.textContent = 'Loading...';
+        ragSampleSection.style.display = 'none';
 
         const config = getCurrentRagConfig();
 
@@ -902,7 +1045,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ragSampleSection.style.display = 'block';
         } finally {
             ragSampleBtn.disabled = false;
-            ragSampleBtn.textContent = 'Sample';
+            ragSampleBtn.textContent = 'Preview';
         }
     }
 
@@ -999,6 +1142,42 @@ document.addEventListener('DOMContentLoaded', () => {
     ragTestBtn.addEventListener('click', testRagConnection);
     ragSaveBtn.addEventListener('click', saveRagConfig);
     ragSampleBtn.addEventListener('click', fetchSampleRecords);
+
+    // Blur validation for required fields
+    ragLocalPath.addEventListener('blur', () => {
+        if (getSelectedRagMode() === 'local' && ragLocalPath.value.trim() === '') {
+            validateRequiredField(ragLocalPath, 'ChromaDB path is required');
+        }
+    });
+    ragLocalPath.addEventListener('focus', () => clearFieldValidation(ragLocalPath));
+
+    ragServerHost.addEventListener('blur', () => {
+        if (getSelectedRagMode() === 'server' && ragServerHost.value.trim() === '') {
+            validateRequiredField(ragServerHost, 'Host is required');
+        }
+    });
+    ragServerHost.addEventListener('focus', () => clearFieldValidation(ragServerHost));
+
+    ragServerPort.addEventListener('blur', () => {
+        if (getSelectedRagMode() === 'server' && !ragServerPort.value) {
+            validateRequiredField(ragServerPort, 'Port is required');
+        }
+    });
+    ragServerPort.addEventListener('focus', () => clearFieldValidation(ragServerPort));
+
+    ragTenantId.addEventListener('blur', () => {
+        if (getSelectedRagMode() === 'cloud' && ragTenantId.value.trim() === '') {
+            validateRequiredField(ragTenantId, 'Tenant ID is required');
+        }
+    });
+    ragTenantId.addEventListener('focus', () => clearFieldValidation(ragTenantId));
+
+    ragDatabase.addEventListener('blur', () => {
+        if (getSelectedRagMode() === 'cloud' && ragDatabase.value.trim() === '') {
+            validateRequiredField(ragDatabase, 'Database name is required');
+        }
+    });
+    ragDatabase.addEventListener('focus', () => clearFieldValidation(ragDatabase));
 
     // Load RAG config on page load
     loadRagConfig();

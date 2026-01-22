@@ -86,94 +86,160 @@
                         <section class="tab-panel" data-panel="rag">
                             <p class="section-description">Configure ChromaDB for Retrieval-Augmented Generation (RAG).</p>
 
-                            <!-- Mode Selection -->
-                            <div class="setting-item">
-                                <label class="setting-label">Connection Mode</label>
-                                <div class="mode-radio-group">
-                                    <label class="mode-radio">
-                                        <input type="radio" name="rag-mode" value="local" checked>
-                                        <span class="radio-label">Local (PersistentClient)</span>
-                                        <span class="radio-description">Direct file-based storage on this machine</span>
-                                    </label>
-                                    <label class="mode-radio">
-                                        <input type="radio" name="rag-mode" value="server">
-                                        <span class="radio-label">Local Server (HttpClient)</span>
-                                        <span class="radio-description">Connect to a ChromaDB server running locally</span>
-                                    </label>
-                                    <label class="mode-radio">
-                                        <input type="radio" name="rag-mode" value="cloud">
-                                        <span class="radio-label">Cloud (ChromaDB Cloud)</span>
-                                        <span class="radio-description">Connect to ChromaDB Cloud service</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- Local Mode Settings -->
-                            <div id="rag-local-settings" class="rag-mode-section">
-                                <div class="setting-item">
-                                    <label for="rag-local-path">ChromaDB Path</label>
-                                    <input type="text" id="rag-local-path" class="text-input"
-                                           placeholder="/path/to/chromadb">
-                                    <div id="rag-path-status" class="validation-status"></div>
-                                </div>
-                            </div>
-
-                            <!-- Server Mode Settings -->
-                            <div id="rag-server-settings" class="rag-mode-section" style="display: none;">
-                                <div class="setting-item">
-                                    <label for="rag-server-host">Host</label>
-                                    <input type="text" id="rag-server-host" class="text-input"
-                                           placeholder="localhost" value="localhost">
-                                </div>
-                                <div class="setting-item">
-                                    <label for="rag-server-port">Port</label>
-                                    <input type="number" id="rag-server-port" class="text-input"
-                                           placeholder="8000" value="8000">
-                                </div>
-                            </div>
-
-                            <!-- Cloud Mode Settings -->
-                            <div id="rag-cloud-settings" class="rag-mode-section" style="display: none;">
-                                <div class="setting-item">
-                                    <label for="rag-tenant-id">Tenant ID</label>
-                                    <input type="text" id="rag-tenant-id" class="text-input"
-                                           placeholder="Enter your ChromaDB tenant ID">
-                                </div>
-                                <div class="setting-item">
-                                    <label for="rag-database">Database Name</label>
-                                    <input type="text" id="rag-database" class="text-input"
-                                           placeholder="Enter database name">
-                                </div>
-                                <div class="setting-item">
-                                    <label>API Key Status</label>
-                                    <div id="rag-api-key-status" class="api-key-status">
-                                        <span class="status-checking">Checking...</span>
+                            <!-- Wizard Steps Container -->
+                            <div class="rag-wizard">
+                                <!-- Step 1: Configure -->
+                                <div class="wizard-step" data-step="1">
+                                    <div class="step-header">
+                                        <div class="step-number">1</div>
+                                        <div class="step-title">Configure Connection</div>
                                     </div>
-                                    <span class="field-hint">API key is configured via CHROMADB_API_KEY environment variable</span>
-                                </div>
-                            </div>
+                                    <div class="step-content">
+                                        <!-- Mode Selection -->
+                                        <div class="setting-item">
+                                            <label class="setting-label">Connection Mode</label>
+                                            <div class="mode-radio-group">
+                                                <label class="mode-radio">
+                                                    <input type="radio" name="rag-mode" value="local" checked>
+                                                    <div class="radio-content">
+                                                        <span class="radio-label">Local (PersistentClient)</span>
+                                                        <span class="radio-description">Direct file-based storage on this machine</span>
+                                                    </div>
+                                                    <a href="https://docs.trychroma.com/docs/run-chroma/persistent-client" target="_blank" rel="noopener" class="mode-info-icon" title="View documentation">
+                                                        <span class="info-icon-inner">i</span>
+                                                    </a>
+                                                </label>
+                                                <label class="mode-radio">
+                                                    <input type="radio" name="rag-mode" value="server">
+                                                    <div class="radio-content">
+                                                        <span class="radio-label">Local Server (HttpClient)</span>
+                                                        <span class="radio-description">Connect to a ChromaDB server running locally</span>
+                                                    </div>
+                                                    <a href="https://docs.trychroma.com/docs/run-chroma/client-server" target="_blank" rel="noopener" class="mode-info-icon" title="View documentation">
+                                                        <span class="info-icon-inner">i</span>
+                                                    </a>
+                                                </label>
+                                                <label class="mode-radio">
+                                                    <input type="radio" name="rag-mode" value="cloud">
+                                                    <div class="radio-content">
+                                                        <span class="radio-label">Cloud (ChromaDB Cloud)</span>
+                                                        <span class="radio-description">Connect to ChromaDB Cloud managed service</span>
+                                                    </div>
+                                                    <a href="https://docs.trychroma.com/docs/chroma-cloud/overview" target="_blank" rel="noopener" class="mode-info-icon" title="View documentation">
+                                                        <span class="info-icon-inner">i</span>
+                                                    </a>
+                                                </label>
+                                            </div>
+                                        </div>
 
-                            <!-- Actions -->
-                            <div class="setting-item rag-actions">
-                                <button type="button" id="rag-test-btn" class="toolbar-btn">Test Connection</button>
-                                <button type="button" id="rag-save-btn" class="save-btn" disabled>Save Settings</button>
-                            </div>
+                                        <!-- Local Mode Settings -->
+                                        <div id="rag-local-settings" class="rag-mode-section">
+                                            <div class="setting-item">
+                                                <label for="rag-local-path" class="required-label">ChromaDB Path <span class="required-asterisk">*</span></label>
+                                                <input type="text" id="rag-local-path" class="text-input"
+                                                       placeholder="/path/to/chromadb" required>
+                                                <div id="rag-path-status" class="validation-status"></div>
+                                            </div>
+                                        </div>
 
-                            <!-- Connection Test Result -->
-                            <div id="rag-test-result" class="test-result"></div>
+                                        <!-- Server Mode Settings -->
+                                        <div id="rag-server-settings" class="rag-mode-section" style="display: none;">
+                                            <div class="setting-item">
+                                                <label for="rag-server-host" class="required-label">Host <span class="required-asterisk">*</span></label>
+                                                <input type="text" id="rag-server-host" class="text-input"
+                                                       placeholder="localhost" value="localhost" required>
+                                            </div>
+                                            <div class="setting-item">
+                                                <label for="rag-server-port" class="required-label">Port <span class="required-asterisk">*</span></label>
+                                                <input type="number" id="rag-server-port" class="text-input"
+                                                       placeholder="8000" value="8000" required>
+                                            </div>
+                                        </div>
 
-                            <!-- Collection Selection (shown after successful connection) -->
-                            <div id="rag-collection-section" class="setting-item" style="display: none;">
-                                <label for="rag-collection-select">Collection</label>
-                                <div class="collection-row">
-                                    <div class="select-wrapper">
-                                        <select id="rag-collection-select">
-                                            <option value="">Select a collection...</option>
-                                        </select>
+                                        <!-- Cloud Mode Settings -->
+                                        <div id="rag-cloud-settings" class="rag-mode-section" style="display: none;">
+                                            <div class="setting-item">
+                                                <label for="rag-tenant-id" class="required-label">Tenant ID <span class="required-asterisk">*</span></label>
+                                                <input type="text" id="rag-tenant-id" class="text-input"
+                                                       placeholder="Enter your ChromaDB tenant ID" required>
+                                            </div>
+                                            <div class="setting-item">
+                                                <label for="rag-database" class="required-label">Database Name <span class="required-asterisk">*</span></label>
+                                                <input type="text" id="rag-database" class="text-input"
+                                                       placeholder="Enter database name" required>
+                                            </div>
+                                            <div class="setting-item">
+                                                <label>API Key Status</label>
+                                                <div id="rag-api-key-status" class="api-key-status">
+                                                    <span class="status-checking">Checking...</span>
+                                                </div>
+                                                <span class="field-hint">API key is configured via CHROMADB_API_KEY environment variable</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <button type="button" id="rag-sample-btn" class="toolbar-btn" style="display: none;">Sample</button>
                                 </div>
-                                <span class="field-hint">Select a collection to use for RAG queries</span>
+
+                                <!-- Step 2: Test Connection -->
+                                <div class="wizard-step" data-step="2">
+                                    <div class="step-header">
+                                        <div class="step-number">2</div>
+                                        <div class="step-title">Test Connection</div>
+                                    </div>
+                                    <div class="step-content">
+                                        <div class="test-action-row">
+                                            <button type="button" id="rag-test-btn" class="test-connection-btn">
+                                                <span class="btn-icon">&#x2192;</span>
+                                                Test Connection
+                                            </button>
+                                            <span id="rag-test-hint" class="test-hint">Verify your configuration works</span>
+                                        </div>
+                                        <div id="rag-test-result" class="test-result"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Step 3: Select Collection -->
+                                <div class="wizard-step" data-step="3" id="rag-step-3">
+                                    <div class="step-header">
+                                        <div class="step-number">3</div>
+                                        <div class="step-title">Select Collection</div>
+                                    </div>
+                                    <div class="step-content">
+                                        <div id="rag-collection-section" class="collection-section">
+                                            <div class="collection-row">
+                                                <div class="select-wrapper">
+                                                    <select id="rag-collection-select">
+                                                        <option value="">Select a collection...</option>
+                                                    </select>
+                                                </div>
+                                                <button type="button" id="rag-sample-btn" class="toolbar-btn sample-btn" style="display: none;">
+                                                    Preview
+                                                </button>
+                                            </div>
+                                            <span class="field-hint">Choose which collection to use for RAG queries</span>
+                                        </div>
+                                        <div id="rag-collection-placeholder" class="step-placeholder">
+                                            <span class="placeholder-icon">&#x1F50D;</span>
+                                            <span>Test connection first to see available collections</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Step 4: Save -->
+                                <div class="wizard-step" data-step="4">
+                                    <div class="step-header">
+                                        <div class="step-number">4</div>
+                                        <div class="step-title">Save Configuration</div>
+                                    </div>
+                                    <div class="step-content">
+                                        <div class="save-action-row">
+                                            <button type="button" id="rag-save-btn" class="save-btn-enhanced" disabled>
+                                                <span class="save-btn-text">Save Settings</span>
+                                                <span class="save-btn-badge" style="display: none;"></span>
+                                            </button>
+                                            <span id="rag-save-status" class="save-status"></span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Sample Records Display -->
