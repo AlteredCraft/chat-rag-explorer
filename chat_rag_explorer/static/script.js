@@ -897,6 +897,52 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         html += '</div>';
 
+        // RAG Documents section (if RAG was used)
+        if (metadata.rag && metadata.rag.documents && metadata.rag.documents.length > 0) {
+            const docCount = metadata.rag.documents.length;
+            const collectionName = metadata.rag.collection || 'Unknown';
+            html += '<div class="details-section">';
+            html += `<div class="details-section-header">Retrieved Documents <span class="msg-count">(${docCount} from ${escapeHtml(collectionName)})</span></div>`;
+
+            metadata.rag.documents.forEach((doc, i) => {
+                const meta = metadata.rag.metadatas && metadata.rag.metadatas[i] ? metadata.rag.metadatas[i] : {};
+                const distance = metadata.rag.distances && metadata.rag.distances[i] !== undefined
+                    ? metadata.rag.distances[i].toFixed(4)
+                    : null;
+
+                html += '<div class="details-rag-document">';
+
+                // Document header with metadata
+                html += '<div class="details-rag-header">';
+                html += `<span class="details-rag-index">#${i + 1}</span>`;
+                if (meta.title) {
+                    html += `<span class="details-rag-title">${escapeHtml(meta.title)}</span>`;
+                }
+                if (distance !== null) {
+                    html += `<span class="details-rag-distance">dist: ${distance}</span>`;
+                }
+                html += '</div>';
+
+                // Metadata fields (if any exist)
+                const metaFields = [];
+                if (meta.section_title) metaFields.push(`Section: ${meta.section_title}`);
+                if (meta.section_number) metaFields.push(`#${meta.section_number}`);
+                if (meta.author) metaFields.push(`Author: ${meta.author}`);
+                if (meta.url) metaFields.push(`<a href="${escapeHtml(meta.url)}" target="_blank" rel="noopener">Source</a>`);
+
+                if (metaFields.length > 0) {
+                    html += `<div class="details-rag-meta">${metaFields.join(' · ')}</div>`;
+                }
+
+                // Document content (truncated preview)
+                const preview = doc.length > 300 ? doc.substring(0, 300) + '...' : doc;
+                html += `<div class="details-rag-content">${escapeHtml(preview)}</div>`;
+                html += '</div>';
+            });
+
+            html += '</div>';
+        }
+
         // Prompt section (messages array from backend)
         if (metadata.messages && metadata.messages.length > 0) {
             const msgCount = metadata.messages.length;

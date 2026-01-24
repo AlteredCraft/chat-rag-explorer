@@ -34,16 +34,38 @@ def generate_request_id():
     return str(uuid.uuid4())[:8]
 
 
-def build_augmented_message(user_message, documents):
+def escape_xml_attr(value):
+    """
+    Escape a string value for use in an XML attribute.
+
+    Handles special characters: &, <, >, ", '
+    """
+    if not isinstance(value, str):
+        value = str(value)
+    return (value
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&apos;"))
+
+
+# Metadata fields to include as attributes on document tags (if present)
+METADATA_FIELDS = ['title', 'author', 'url', 'section_title', 'section_number']
+
+
+def build_augmented_message(user_message, documents, metadatas=None):
     """
     Augment a user message with retrieved RAG context using XML tags.
 
     Wraps retrieved documents in <knowledge_base_context> and the user's
-    message in <original_user_message> for clear structure.
+    message in <original_user_message> for clear structure. Each document
+    tag includes metadata attributes (title, author, url, etc.) when available.
 
     Args:
         user_message: The original user message text
         documents: List of retrieved document texts
+        metadatas: Optional list of metadata dicts for each document
 
     Returns:
         Augmented message string with context prepended in XML format
@@ -53,7 +75,17 @@ def build_augmented_message(user_message, documents):
 
     context_parts = ["<knowledge_base_context>"]
     for i, doc in enumerate(documents, 1):
-        context_parts.append(f'<document index="{i}">{doc}</document>')
+        # Build attributes list starting with index
+        attrs = [f'index="{i}"']
+
+        # Add metadata fields if available
+        if metadatas and (i - 1) < len(metadatas):
+            meta = metadatas[i - 1] or {}
+            for key in METADATA_FIELDS:
+                if key in meta and meta[key]:
+                    attrs.append(f'{key}="{escape_xml_attr(meta[key])}"')
+
+        context_parts.append(f'<document {" ".join(attrs)}>{doc}</document>')
     context_parts.append("</knowledge_base_context>")
     context_parts.append("")
     context_parts.append("<original_user_message>")
@@ -292,7 +324,8 @@ def chat():
                 # Build augmented message with context
                 augmented_content = build_augmented_message(
                     latest_user_msg,
-                    rag_result["documents"]
+                    rag_result["documents"],
+                    rag_result.get("metadatas")
                 )
 
                 # Create modified messages array with augmented last user message
@@ -368,6 +401,7 @@ def chat():
                     "documents_retrieved": len(rag_context["documents"]) if rag_context else 0,
                     "collection": rag_context.get("collection") if rag_context else None,
                     "documents": rag_context.get("documents", []) if rag_context else [],
+                    "metadatas": rag_context.get("metadatas", []) if rag_context else [],
                     "distances": rag_context.get("distances", []) if rag_context else [],
                     "ids": rag_context.get("ids", []) if rag_context else [],
                 }
@@ -429,6 +463,7 @@ def chat():
                     "documents_retrieved": len(rag_context["documents"]) if rag_context else 0,
                     "collection": rag_context.get("collection") if rag_context else None,
                     "documents": rag_context.get("documents", []) if rag_context else [],
+                    "metadatas": rag_context.get("metadatas", []) if rag_context else [],
                     "distances": rag_context.get("distances", []) if rag_context else [],
                     "ids": rag_context.get("ids", []) if rag_context else [],
                 }

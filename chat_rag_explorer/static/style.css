@@ -1059,6 +1059,79 @@ button:disabled {
     font-size: 0.75rem;
 }
 
+/* RAG document cards in details modal */
+.details-rag-document {
+    margin-bottom: 0.75rem;
+    padding: 0.85rem;
+    background-color: #fff;
+    border: 1px solid #e2e8f0;
+    border-left: 3px solid #805ad5;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.details-rag-document:last-child {
+    margin-bottom: 0;
+}
+
+.details-rag-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.details-rag-index {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #805ad5;
+    background: #f3e8ff;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+}
+
+.details-rag-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.details-rag-distance {
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: #718096;
+    font-family: "SFMono-Regular", Consolas, monospace;
+}
+
+.details-rag-meta {
+    font-size: 0.75rem;
+    color: #718096;
+    margin-bottom: 0.5rem;
+}
+
+.details-rag-meta a {
+    color: #805ad5;
+    text-decoration: none;
+}
+
+.details-rag-meta a:hover {
+    text-decoration: underline;
+}
+
+.details-rag-content {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: #4a5568;
+    background: #f7fafc;
+    padding: 0.625rem;
+    border-radius: 0.25rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
 /* Message blocks in details */
 .details-message {
     margin-bottom: 0.75rem;
