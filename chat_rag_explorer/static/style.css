@@ -979,7 +979,14 @@ button:disabled {
     color: #333;
 }
 
-.modal-close-btn {
+.modal-header-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modal-close-btn,
+.modal-maximize-btn {
     background: none;
     border: none;
     font-size: 1.5rem;
@@ -989,8 +996,33 @@ button:disabled {
     line-height: 1;
 }
 
-.modal-close-btn:hover {
+.modal-close-btn:hover,
+.modal-maximize-btn:hover {
     color: #333;
+}
+
+.modal-maximize-btn {
+    font-size: 1.1rem;
+}
+
+.modal-maximize-btn .restore-icon {
+    display: none;
+}
+
+.details-modal.maximized .modal-maximize-btn .maximize-icon {
+    display: none;
+}
+
+.details-modal.maximized .modal-maximize-btn .restore-icon {
+    display: inline;
+}
+
+/* Maximized state */
+.details-modal.maximized {
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100vh - 2rem);
+    width: calc(100vw - 2rem);
+    height: calc(100vh - 2rem);
 }
 
 .details-modal-body {

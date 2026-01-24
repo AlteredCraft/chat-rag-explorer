@@ -160,7 +160,13 @@
             <div class="modal details-modal">
                 <div class="details-modal-header">
                     <h3>What the LLM Received</h3>
-                    <button id="details-modal-close" class="modal-close-btn">&times;</button>
+                    <div class="modal-header-buttons">
+                        <button id="details-modal-maximize" class="modal-maximize-btn" title="Maximize">
+                            <span class="maximize-icon">&#x26F6;</span>
+                            <span class="restore-icon">&#x2750;</span>
+                        </button>
+                        <button id="details-modal-close" class="modal-close-btn">&times;</button>
+                    </div>
                 </div>
                 <div class="details-modal-body">
                     <div id="details-content"></div>

@@ -778,10 +778,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailsModal = document.getElementById('details-modal');
     const detailsContent = document.getElementById('details-content');
     const detailsModalClose = document.getElementById('details-modal-close');
+    const detailsModalMaximize = document.getElementById('details-modal-maximize');
+    const detailsModalInner = detailsModal ? detailsModal.querySelector('.details-modal') : null;
 
     if (detailsModalClose) {
         detailsModalClose.addEventListener('click', () => {
             detailsModal.classList.remove('visible');
+            if (detailsModalInner) {
+                detailsModalInner.classList.remove('maximized');
+            }
+        });
+    }
+
+    if (detailsModalMaximize && detailsModalInner) {
+        detailsModalMaximize.addEventListener('click', () => {
+            detailsModalInner.classList.toggle('maximized');
         });
     }
 
@@ -789,6 +800,9 @@ document.addEventListener('DOMContentLoaded', () => {
         detailsModal.addEventListener('click', (e) => {
             if (e.target === detailsModal) {
                 detailsModal.classList.remove('visible');
+                if (detailsModalInner) {
+                    detailsModalInner.classList.remove('maximized');
+                }
             }
         });
     }
