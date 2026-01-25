@@ -77,6 +77,8 @@ def find_markdown_files(directory: str | Path) -> list[Path]:
     """
     Recursively find all markdown files in a directory.
 
+    Skips files whose names start with underscore (e.g., _README.md, _canon_bible.md).
+
     Args:
         directory: Path to the directory to search
 
@@ -84,7 +86,7 @@ def find_markdown_files(directory: str | Path) -> list[Path]:
         List of Path objects for each .md file found
     """
     directory = Path(directory)
-    return sorted(directory.rglob("*.md"))
+    return sorted(f for f in directory.rglob("*.md") if not f.name.startswith("_"))
 
 
 class ParseError(Exception):

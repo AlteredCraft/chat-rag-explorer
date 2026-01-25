@@ -120,6 +120,20 @@ class TestFindMarkdownFiles:
         names = [f.name for f in result]
         assert names == ["a.md", "b.md", "c.md"]
 
+    def test_skips_underscore_prefixed_files(self, tmp_path):
+        """Should skip files whose names start with underscore."""
+        (tmp_path / "chapter1.md").write_text("# Chapter 1")
+        (tmp_path / "_README.md").write_text("# README")
+        (tmp_path / "_canon_bible.md").write_text("# Canon Bible")
+        (tmp_path / "chapter2.md").write_text("# Chapter 2")
+
+        result = find_markdown_files(tmp_path)
+
+        names = [f.name for f in result]
+        assert names == ["chapter1.md", "chapter2.md"]
+        assert "_README.md" not in names
+        assert "_canon_bible.md" not in names
+
 
 class TestParseMarkdown:
     """Tests for parse_markdown function."""
