@@ -43,6 +43,34 @@ const SettingsLogger = {
 document.addEventListener('DOMContentLoaded', () => {
     SettingsLogger.info('Settings page initializing');
 
+    // API key status check
+    const apiKeyBanner = document.getElementById('api-key-banner');
+    const bannerDismiss = document.getElementById('banner-dismiss');
+
+    async function checkApiKeyStatus() {
+        try {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+
+            if (!data.api_key_configured && apiKeyBanner) {
+                apiKeyBanner.style.display = 'block';
+                SettingsLogger.info('API key not configured, showing banner');
+            }
+            return data.api_key_configured;
+        } catch (error) {
+            SettingsLogger.error('Failed to check API key status', { error: error.message });
+            return false;
+        }
+    }
+
+    if (bannerDismiss) {
+        bannerDismiss.addEventListener('click', () => {
+            if (apiKeyBanner) {
+                apiKeyBanner.style.display = 'none';
+            }
+        });
+    }
+
     // Tab navigation
     const TAB_STORAGE_KEY = 'chat-rag-settings-tab';
     const tabButtons = document.querySelectorAll('.tab-btn');
@@ -114,10 +142,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Restore filter state and load models
     freeOnlyFilter.checked = localStorage.getItem(FILTER_STORAGE_KEY) === 'true';
-    loadModels();
+
+    // Check API key status first, then load models accordingly
+    async function initializeModels() {
+        const apiKeyConfigured = await checkApiKeyStatus();
+        await loadModels(apiKeyConfigured);
+    }
+    initializeModels();
     loadPrompts();
 
-    async function loadModels() {
+    async function loadModels(apiKeyConfigured) {
+        // If API key is not configured, show message and skip loading
+        if (!apiKeyConfigured) {
+            SettingsLogger.info('Skipping model load - API key not configured');
+            modelSelect.innerHTML = '<option value="">API key required to load models</option>';
+            modelSelect.disabled = true;
+            return;
+        }
+
         SettingsLogger.info('Loading models from API');
         const startTime = performance.now();
         loadingIndicator.classList.add('active');
