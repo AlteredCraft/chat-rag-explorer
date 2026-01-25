@@ -219,3 +219,45 @@ def _make_chunk(usage=None, model=None):
             self.usage = usage
             self.model = model
     return Chunk()
+
+
+class TestChatServiceIsConfigured:
+    """Tests for ChatService.is_configured method."""
+
+    def test_returns_true_when_api_key_set(self, app_context):
+        """Returns True when OPENROUTER_API_KEY is configured."""
+        from chat_rag_explorer.services import ChatService
+
+        app_context.config["OPENROUTER_API_KEY"] = "sk-valid-api-key-12345"
+        service = ChatService()
+
+        assert service.is_configured() is True
+
+    def test_returns_false_when_api_key_empty(self, app_context):
+        """Returns False when OPENROUTER_API_KEY is empty string."""
+        from chat_rag_explorer.services import ChatService
+
+        app_context.config["OPENROUTER_API_KEY"] = ""
+        service = ChatService()
+
+        assert service.is_configured() is False
+
+    def test_returns_false_when_api_key_none(self, app_context):
+        """Returns False when OPENROUTER_API_KEY is None."""
+        from chat_rag_explorer.services import ChatService
+
+        app_context.config["OPENROUTER_API_KEY"] = None
+        service = ChatService()
+
+        assert service.is_configured() is False
+
+    def test_returns_false_when_api_key_missing(self, app_context):
+        """Returns False when OPENROUTER_API_KEY key is missing entirely."""
+        from chat_rag_explorer.services import ChatService
+
+        # Remove the key from config
+        if "OPENROUTER_API_KEY" in app_context.config:
+            del app_context.config["OPENROUTER_API_KEY"]
+        service = ChatService()
+
+        assert service.is_configured() is False

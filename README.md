@@ -1,8 +1,8 @@
 # Chat RAG Explorer
 
-An educational application designed to demonstrate the implementation of a Chat interface with Large Language Models (LLMs) and, in future steps, Retrieval-Augmented Generation (RAG).
+An educational application designed to demonstrate the implementation of a Chat interface with Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG). This project is used as a teaching aid for hands-on RAG workshops, such as [Building RAG Applications](https://alteredcraft.com/rag-workshop). Interested in having a similar course delivered to your team? Contact [info@alteredcraft.com](mailto:info@alteredcraft.com).
 
-This project uses **Flask** for the backend, **OpenRouter** for LLM access (supporting models like GPT-4, Claude 3, Llama 3, etc.), and **vanilla JavaScript** for a clean, streaming chat interface.
+This project uses **Flask** for the backend, **OpenRouter** for LLM access (supporting models like GPT-4, Claude 3, Llama 3, etc.), and **vanilla JavaScript** for a clean, streaming chat interface. The app can start without an API key configured, displaying helpful setup instructions in the UI.
 
 ## Prerequisites
 
@@ -21,6 +21,8 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
     ```
 
 2.  **Set up the environment variables**
+    🛑 If the app is running, first stop it (Ctrl+C).
+
     ```bash
     cp .env.example .env
     ```

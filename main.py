@@ -5,7 +5,12 @@ This module handles:
 - Flask application startup with debug mode
 - Automatic port discovery (tries ports 8000-8004 if one is busy)
 - Werkzeug reloader compatibility for hot-reloading during development
-- Environment validation (requires .env with OPENROUTER_API_KEY)
+- Environment validation (warns if .env or OPENROUTER_API_KEY missing, but allows startup)
+
+The app will start without an API key configured. In this case:
+- Console shows warning messages with setup instructions
+- Frontend displays a prominent banner explaining the situation
+- Chat input is disabled until an API key is configured
 
 Usage:
     uv run main.py
@@ -13,7 +18,6 @@ Usage:
 import logging
 import os
 import socket
-import sys
 from pathlib import Path
 
 from chat_rag_explorer import create_app, is_reloader_process
@@ -30,26 +34,30 @@ def validate_environment() -> None:
     - .env file exists in project root
     - OPENROUTER_API_KEY is set and not empty
 
-    Exits with helpful error message if validation fails.
+    Logs warnings if validation fails but allows the app to start.
+    The frontend will display appropriate messaging when API key is missing.
     """
     env_path = Path(__file__).parent / ".env"
 
     if not env_path.exists():
-        print("\n❌ ERROR: .env file not found!", file=sys.stderr)
-        print("\nTo get started:", file=sys.stderr)
-        print("  1. Copy .env.example to .env:", file=sys.stderr)
-        print("     cp .env.example .env", file=sys.stderr)
-        print("  2. Add your OpenRouter API key to .env:", file=sys.stderr)
-        print("     OPENROUTER_API_KEY=your_api_key_here", file=sys.stderr)
-        print("\nGet an API key at: https://openrouter.ai/keys\n", file=sys.stderr)
-        sys.exit(1)
+        logger.warning("=" * 60)
+        logger.warning(".env file not found!")
+        logger.warning("To get started:")
+        logger.warning("  1. Copy .env.example to .env:")
+        logger.warning("     cp .env.example .env")
+        logger.warning("  2. Add your OpenRouter API key to .env:")
+        logger.warning("     OPENROUTER_API_KEY=your_api_key_here")
+        logger.warning("Get an API key at: https://openrouter.ai/keys")
+        logger.warning("=" * 60)
+        return
 
     if not Config.OPENROUTER_API_KEY:
-        print("\n❌ ERROR: OPENROUTER_API_KEY is not set!", file=sys.stderr)
-        print("\nAdd your OpenRouter API key to .env:", file=sys.stderr)
-        print("  OPENROUTER_API_KEY=your_api_key_here", file=sys.stderr)
-        print("\nGet an API key at: https://openrouter.ai/keys\n", file=sys.stderr)
-        sys.exit(1)
+        logger.warning("=" * 60)
+        logger.warning("OPENROUTER_API_KEY is not set!")
+        logger.warning("Add your OpenRouter API key to .env:")
+        logger.warning("  OPENROUTER_API_KEY=your_api_key_here")
+        logger.warning("Get an API key at: https://openrouter.ai/keys")
+        logger.warning("=" * 60)
 
 
 validate_environment()

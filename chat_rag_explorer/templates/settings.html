@@ -16,6 +16,23 @@
                     </div>
                 </header>
 
+                <!-- API Key Warning Banner -->
+                <div id="api-key-banner" class="api-key-banner" style="display: none;">
+                    <div class="banner-content">
+                        <div class="banner-icon">&#9888;</div>
+                        <div class="banner-text">
+                            <strong>API Key Required</strong>
+                            <p>The app cannot send messages without an OpenRouter API key.</p>
+                            <ul>
+                                <li>Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a></li>
+                                <li>Taking a course? Your instructor will provide a key.</li>
+                                <li>See README for installation instructions.</li>
+                            </ul>
+                        </div>
+                        <button id="banner-dismiss" class="banner-dismiss" title="Dismiss">&times;</button>
+                    </div>
+                </div>
+
                 <div class="settings-content">
                     <nav class="settings-tabs">
                         <button class="tab-btn active" data-tab="model">Model Selection</button>

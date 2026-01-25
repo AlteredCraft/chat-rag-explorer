@@ -49,6 +49,75 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = chatForm.querySelector('button');
     // Settings link navigates directly (chat is preserved in sessionStorage)
 
+    // API key status tracking
+    let apiKeyConfigured = true; // Assume configured until we check
+    const apiKeyBanner = document.getElementById('api-key-banner');
+    const bannerDismiss = document.getElementById('banner-dismiss');
+
+    /**
+     * Check if the OpenRouter API key is configured and update UI accordingly.
+     */
+    async function checkApiKeyStatus() {
+        try {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+
+            apiKeyConfigured = data.api_key_configured;
+            AppLogger.info('API key status checked', { configured: apiKeyConfigured });
+
+            updateApiKeyUI();
+        } catch (error) {
+            AppLogger.error('Failed to check API key status', { error: error.message });
+            // On error, assume it's configured to avoid blocking the user
+            apiKeyConfigured = true;
+            updateApiKeyUI();
+        }
+    }
+
+    /**
+     * Update UI elements based on API key configuration status.
+     */
+    function updateApiKeyUI() {
+        if (!apiKeyConfigured) {
+            // Show warning banner
+            if (apiKeyBanner) {
+                apiKeyBanner.style.display = 'block';
+            }
+
+            // Disable chat input
+            messageInput.disabled = true;
+            messageInput.classList.add('input-disabled');
+            messageInput.placeholder = 'API key required - see banner above';
+            submitButton.disabled = true;
+
+            AppLogger.info('UI updated: API key not configured');
+        } else {
+            // Hide warning banner
+            if (apiKeyBanner) {
+                apiKeyBanner.style.display = 'none';
+            }
+
+            // Enable chat input (unless already disabled for other reasons)
+            messageInput.classList.remove('input-disabled');
+            messageInput.placeholder = 'Type your message...';
+            // Note: Don't enable buttons here as they may be disabled during message send
+
+            AppLogger.info('UI updated: API key configured');
+        }
+    }
+
+    // Handle banner dismiss button
+    if (bannerDismiss) {
+        bannerDismiss.addEventListener('click', () => {
+            if (apiKeyBanner) {
+                apiKeyBanner.style.display = 'none';
+            }
+        });
+    }
+
+    // Check API key status on load
+    checkApiKeyStatus();
+
     // Clear chat button
     const clearChatBtn = document.getElementById('clear-chat-btn');
     if (clearChatBtn) {
@@ -454,6 +523,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        // Don't send if API key is not configured
+        if (!apiKeyConfigured) {
+            AppLogger.warn('Cannot send message: API key not configured');
+            if (apiKeyBanner) {
+                apiKeyBanner.style.display = 'block';
+            }
+            return;
+        }
 
         const message = messageInput.value.trim();
         if (!message) return;

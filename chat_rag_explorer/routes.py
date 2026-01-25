@@ -101,6 +101,19 @@ def index():
     return render_template("index.html")
 
 
+@main_bp.route("/api/status")
+def get_status():
+    """GET - Return application status including API key configuration."""
+    request_id = generate_request_id()
+    logger.debug(f"[{request_id}] GET /api/status - Checking app status")
+
+    api_key_configured = chat_service.is_configured()
+
+    return jsonify({
+        "api_key_configured": api_key_configured
+    })
+
+
 @main_bp.route("/settings")
 def settings():
     logger.debug("Serving settings page")

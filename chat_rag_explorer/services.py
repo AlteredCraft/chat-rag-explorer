@@ -110,6 +110,15 @@ class ChatService:
         self.client = None
         logger.debug("ChatService instance created")
 
+    def is_configured(self):
+        """Check if the OpenRouter API key is configured.
+
+        Returns:
+            bool: True if API key is set and non-empty, False otherwise
+        """
+        api_key = current_app.config.get("OPENROUTER_API_KEY")
+        return bool(api_key and len(api_key) > 0)
+
     def get_client(self):
         if not self.client:
             base_url = current_app.config["OPENROUTER_BASE_URL"]

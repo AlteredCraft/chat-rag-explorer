@@ -196,6 +196,32 @@ class TestPageRoutes:
         assert b"<!DOCTYPE html>" in response.data or b"<html" in response.data
 
 
+class TestGetStatus:
+    """Tests for GET /api/status."""
+
+    @patch("chat_rag_explorer.routes.chat_service")
+    def test_returns_api_key_configured_true(self, mock_service, client):
+        """Returns api_key_configured: true when API key is set."""
+        mock_service.is_configured.return_value = True
+
+        response = client.get("/api/status")
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["api_key_configured"] is True
+
+    @patch("chat_rag_explorer.routes.chat_service")
+    def test_returns_api_key_configured_false(self, mock_service, client):
+        """Returns api_key_configured: false when API key is missing."""
+        mock_service.is_configured.return_value = False
+
+        response = client.get("/api/status")
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["api_key_configured"] is False
+
+
 class TestGetPrompts:
     """Tests for GET /api/prompts."""
 
