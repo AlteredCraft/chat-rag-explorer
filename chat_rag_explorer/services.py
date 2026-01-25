@@ -13,6 +13,7 @@ making it compatible with any OpenAI-compatible backend.
 import json
 import logging
 import time
+from pathlib import Path
 import requests
 from openai import OpenAI
 from flask import current_app
@@ -103,6 +104,28 @@ def sort_models_by_name(models):
         New sorted list (does not mutate input)
     """
     return sorted(models, key=lambda m: m.get("name", m.get("id", "")))
+
+
+def load_models_list():
+    """Load model IDs from .models_list file if it exists.
+
+    This file contains models recommended for RAG scenarios. One model ID
+    per line, lines starting with # are comments, empty lines are ignored.
+
+    Returns:
+        Set of model IDs to include, or None if file doesn't exist or is empty
+    """
+    models_list_path = Path(current_app.root_path).parent / ".models_list"
+    if not models_list_path.exists():
+        return None
+
+    models = set()
+    with open(models_list_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                models.add(line)
+    return models if models else None
 
 
 class ChatService:
@@ -234,7 +257,15 @@ class ChatService:
             response.raise_for_status()
 
             data = response.json()
-            models = sort_models_by_name(data.get("data", []))
+            models = data.get("data", [])
+
+            # Filter by .models_list if it exists
+            models_list = load_models_list()
+            if models_list:
+                models = [m for m in models if m.get("id") in models_list]
+                logger.info(f"[{req_id}] Filtered to {len(models)} models from .models_list")
+
+            models = sort_models_by_name(models)
 
             logger.info(f"[{req_id}] Successfully fetched {len(models)} models ({elapsed:.3f}s)")
             return models

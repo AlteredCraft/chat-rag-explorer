@@ -1,0 +1,24 @@
+# Models recommended for RAG scenarios
+# These models perform well with retrieval-augmented generation tasks
+# One model ID per line, comments start with #
+
+# OpenAI
+openai/gpt-4.1-mini
+openai/gpt-4.1-nano
+
+# Anthropic
+anthropic/claude-sonnet-4
+anthropic/claude-3.5-haiku
+
+# Google
+google/gemini-2.0-flash-001
+google/gemini-2.5-flash-preview-05-20
+
+# Mistral
+mistralai/mistral-small-3.1-24b-instruct
+
+# DeepSeek
+deepseek/deepseek-chat-v3-0324
+
+# Qwen
+qwen/qwen3-32b

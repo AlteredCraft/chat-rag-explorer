@@ -45,11 +45,24 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
 ## Features
 
 *   **Real-time Streaming**: Server-Sent Events (SSE) to stream LLM responses token-by-token
-*   **Model Selection**: Dynamic model picker with all available OpenRouter models, grouped by provider
+*   **Model Selection**: Dynamic model picker with OpenRouter models, filtered to RAG-recommended models via `.models_list`
 *   **Conversation History**: Multi-turn conversation support with context retention
 *   **Metrics Sidebar**: Real-time session metrics including token usage
 *   **Markdown Support**: Secure rendering using Marked.js and DOMPurify (works offline)
 *   **Clean UI**: Responsive interface built with vanilla HTML/CSS/JS
+
+## Model Selection
+
+The app filters available OpenRouter models to those listed in `.models_list`. This file contains models that perform well in RAG scenarios. To customize the available models, edit `.models_list`:
+
+```
+# One model ID per line, comments start with #
+openai/gpt-4.1-mini
+anthropic/claude-sonnet-4
+google/gemini-2.0-flash-001
+```
+
+Delete `.models_list` to show all OpenRouter models (⚠️ hundreds of options, though many not meant for use in chat).
 
 ## RAG (Retrieval-Augmented Generation)
 
@@ -110,7 +123,8 @@ chat-rag-explorer/
 ├── main.py                      # Application entry point
 ├── pyproject.toml               # Dependencies and project metadata (uv)
 ├── .env.example                 # Template for environment variables (.env)
-└── .env                         # Secrets and local overrides (gitignored)
+├── .env                         # Secrets and local overrides (gitignored)
+└── .models_list                 # RAG-recommended models filter (see Model Selection)
 ```
 
 ### Design Patterns
