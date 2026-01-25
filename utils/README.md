@@ -77,10 +77,12 @@ uv run utils/ingest.py ./data/corpus/my_docs my_collection
 
 ### How It Works
 
-1. Recursively finds all `.md` files in the directory
+1. Recursively finds all `.md` files in the directory (skips files starting with `_`)
 2. Extracts YAML frontmatter as metadata
 3. Chunks content using token-based splitting (matching the embedding model's tokenizer)
 4. Stores chunks in ChromaDB at `./data/chroma_db/`
+
+> **Tip**: Use underscore-prefixed files (e.g., `_README.md`, `_canon_bible.md`) for reference documents you don't want ingested into the vector database.
 
 ### Metadata
 

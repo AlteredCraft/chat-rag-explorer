@@ -160,7 +160,7 @@ For local mode, the service validates:
 
 ## Sample Data
 
-A pre-built ChromaDB with ~2,000 chunks from the D&D SRD 5.2 ships at `data/chroma_db_sample/`. To use it:
+A pre-built ChromaDB with 195 chunks from "The Morn Chronicles" (a Star Trek DS9 fan fiction, 28 chapters) ships at `data/chroma_db_sample/`. To use it:
 
 1. Go to Settings > RAG Settings
 2. Select "Local" mode
