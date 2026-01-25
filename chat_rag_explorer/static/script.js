@@ -484,10 +484,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     promptId,
                     contentLength: currentSystemPrompt.length
                 });
+
+                // Update sidebar display with prompt title
+                const promptTitle = data.data.title || promptId;
+                document.getElementById('metric-prompt').textContent = promptTitle;
             }
         } catch (error) {
             AppLogger.warn('Failed to load system prompt, using default', { error: error.message });
             currentSystemPrompt = 'You are a helpful assistant.';
+            document.getElementById('metric-prompt').textContent = 'Default';
         }
 
         // Initialize or reset conversation with loaded prompt (skip if restoring session)

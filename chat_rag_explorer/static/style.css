@@ -93,6 +93,15 @@ body {
     text-decoration: underline;
 }
 
+.value-link {
+    text-decoration: none;
+    color: #222;
+}
+
+.value-link:hover {
+    text-decoration: underline;
+}
+
 .small {
     font-size: 0.85rem;
     color: #888;
