@@ -1,0 +1,52 @@
+THE MORN CHRONICLES - LICENSE
+
+This work is fan fiction based on Star Trek: Deep Space Nine, which is
+owned by Paramount Global (formerly ViacomCBS). Star Trek, Deep Space
+Nine, and all related marks, characters, and elements are trademarks
+of Paramount Global.
+
+This is a transformative, non-commercial fan work created for
+educational and demonstration purposes.
+
+ORIGINAL CREATIVE CONTENT
+
+The original creative elements of this work (Lurian worldbuilding,
+original characters, plot, and prose) are released under:
+
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International
+(CC BY-NC-SA 4.0)
+
+You are free to:
+- Share: Copy and redistribute the material in any medium or format
+- Adapt: Remix, transform, and build upon the material
+
+Under the following terms:
+- Attribution: You must give appropriate credit, provide a link to the
+  license, and indicate if changes were made.
+- NonCommercial: You may not use the material for commercial purposes.
+- ShareAlike: If you remix, transform, or build upon the material, you
+  must distribute your contributions under the same license.
+
+Full license text: https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+DISCLAIMER
+
+This work is not affiliated with, endorsed by, or sponsored by Paramount
+Global or any Star Trek rights holders. It is a fan-created work that
+uses Star Trek elements under fair use principles for transformative,
+non-commercial, educational purposes.
+
+The author makes no claim to Star Trek intellectual property and
+acknowledges all rights remain with their respective owners.
+
+PURPOSE
+
+This corpus was created as demonstration data for Retrieval-Augmented
+Generation (RAG) systems in an educational context. It is designed to
+provide original narrative content set within an established fictional
+universe, enabling testing of retrieval systems with content that does
+not exist in language model training data.
+
+---
+
+Created: January 2026
