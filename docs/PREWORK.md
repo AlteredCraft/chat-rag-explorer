@@ -38,6 +38,8 @@ Note: If Git or clone is just not cooperating, [download the ZIP](https://github
 
 ## 3. Install Dependencies
 
+Run this command from the web app directory (chat-rag-explorer)
+
 ```bash
 uv sync
 ```
@@ -48,7 +50,7 @@ This installs Python 3.13 and all packages in an isolated environment.
 
 ## You made it!! 
 
-Feel free to take a peek at the running chat app before the workshop. We will cover everything in detail during the session, including prepareing a RAG data source for use in the web app.
+Feel free to take a peek at the running chat app before the workshop. We will cover everything in detail during the session, including preparing a RAG data source for use in the web app.
 
 ```bash
 uv run main.py
