@@ -31,6 +31,7 @@ body {
 
 .app-container {
     flex: 1;
+    min-width: 0;
     background-color: var(--chat-bg);
     display: flex;
     flex-direction: column;
