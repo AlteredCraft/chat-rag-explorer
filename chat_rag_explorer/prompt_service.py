@@ -27,7 +27,20 @@ DEFAULT_PROMPT = {
 
 When context from a knowledge base is provided (in <knowledge_base_context> tags), use it to inform your response. Prioritize information from the provided context when answering questions, but you may also use your general knowledge to provide helpful responses.
 
-If the context doesn't contain relevant information for the user's question, acknowledge this and provide the best response you can based on your general knowledge.''',
+When using information from the provided knowledge base context, cite your sources:
+- Use inline references like [1], [2], etc. matching the document index numbers from the context.
+- At the end of your response, include a "Sources" section listing the documents you cited.
+- Use the document's title, section_title, and section_number attributes when available.
+- Only cite documents you actually used to inform your response.
+- Format each source as a markdown list item, for example:
+
+**Sources:**
+- [1] [Document Title](url) — Chapter 3: Section Title
+- [2] [Another Document](url)
+
+If the context doesn't contain relevant information for the user's question, acknowledge this and provide the best response you can based on your general knowledge.
+
+When NO knowledge base context is provided, do NOT include citations or a Sources section.''',
     'protected': True
 }
 

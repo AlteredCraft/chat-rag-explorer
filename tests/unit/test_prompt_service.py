@@ -8,6 +8,15 @@ import pytest
 from chat_rag_explorer.prompt_service import PromptService, DEFAULT_PROMPT_ID, DEFAULT_PROMPT
 
 
+class TestDefaultPrompt:
+    """Tests for the default prompt content."""
+
+    def test_default_prompt_includes_citation_instructions(self):
+        """Default prompt instructs LLM to cite sources with inline references."""
+        assert "[1]" in DEFAULT_PROMPT['content']
+        assert "sources" in DEFAULT_PROMPT['content'].lower()
+
+
 class TestParseFrontmatter:
     """Tests for YAML frontmatter parsing."""
 

@@ -1,5 +1,3 @@
-# Example .allowed_models file
-# Copy to .allowed_models to enable model filtering
 # One model ID per line, comments start with #
 
 # OpenAI

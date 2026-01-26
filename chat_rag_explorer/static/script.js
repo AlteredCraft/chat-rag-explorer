@@ -521,9 +521,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Configure marked for better chat-style breaks
+    const renderer = new marked.Renderer();
+    const originalLinkRenderer = renderer.link.bind(renderer);
+    renderer.link = function(href, title, text) {
+        const html = originalLinkRenderer(href, title, text);
+        return html.replace('<a ', '<a target="_blank" rel="noopener noreferrer" ');
+    };
     marked.setOptions({
         breaks: true,
-        gfm: true
+        gfm: true,
+        renderer: renderer
     });
 
     chatForm.addEventListener('submit', async (e) => {
@@ -635,18 +642,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     AppLogger.debug('Time to first chunk', { ttfc_ms: ttfc.toFixed(2) });
                 }
 
-                // Check for error chunks from backend
-                if (chunk.startsWith('Error:')) {
-                    errorOccurred = true;
-                    errorChunk = chunk;
-                    AppLogger.error('Received error chunk from backend', { chunk });
-                    continue; // Don't render error in chat
-                }
+                // Check if the chunk contains the metadata marker (may be
+                // concatenated with trailing content from the same read)
+                const metaIndex = chunk.indexOf('__METADATA__:');
+                if (metaIndex !== -1) {
+                    // Content before the marker is normal text
+                    const contentPart = chunk.substring(0, metaIndex);
+                    if (contentPart) {
+                        messageBuffer += contentPart;
+                    }
 
-                // Check for metadata marker (full entry from backend)
-                if (chunk.startsWith('__METADATA__:')) {
+                    // Parse metadata JSON after the marker
+                    const metadataJson = chunk.substring(metaIndex + '__METADATA__:'.length);
                     try {
-                        const metadataJson = chunk.replace('__METADATA__:', '');
                         receivedMetadata = JSON.parse(metadataJson);
                         AppLogger.info('Metadata received from backend', receivedMetadata);
 
@@ -662,7 +670,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     } catch (parseError) {
                         AppLogger.error('Failed to parse metadata', { error: parseError.message, chunk: chunk });
                     }
-                    continue; // Don't render metadata in chat
+
+                    // Re-render with any final content (without metadata)
+                    if (contentPart) {
+                        const html = marked.parse(messageBuffer);
+                        botMessageContent.innerHTML = DOMPurify.sanitize(html);
+                        chatHistory.scrollTop = chatHistory.scrollHeight;
+                    }
+                    continue;
+                }
+
+                // Check for error chunks from backend
+                if (chunk.startsWith('Error:')) {
+                    errorOccurred = true;
+                    errorChunk = chunk;
+                    AppLogger.error('Received error chunk from backend', { chunk });
+                    continue; // Don't render error in chat
                 }
 
                 messageBuffer += chunk;
