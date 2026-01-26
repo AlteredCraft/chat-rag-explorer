@@ -389,6 +389,12 @@ class RagConfigService:
         config = self.get_config(request_id)
         collection_name = config.get('collection')
 
+        # Resolve defaults from config before any early returns
+        if n_results is None:
+            n_results = config.get('n_results', 5)
+        if distance_threshold is None:
+            distance_threshold = config.get('distance_threshold')
+
         if not collection_name:
             logger.debug(f"{log_prefix}RAG query skipped: no collection configured")
             return {
@@ -397,14 +403,10 @@ class RagConfigService:
                 'documents': [],
                 'metadatas': [],
                 'distances': [],
-                'ids': []
+                'ids': [],
+                'n_results': n_results,
+                'distance_threshold': distance_threshold,
             }
-
-        # Use config defaults if not provided
-        if n_results is None:
-            n_results = config.get('n_results', 5)
-        if distance_threshold is None:
-            distance_threshold = config.get('distance_threshold')
 
         try:
             client = self._create_client(config, request_id)
@@ -447,7 +449,9 @@ class RagConfigService:
                 'documents': documents,
                 'metadatas': metadatas,
                 'distances': distances,
-                'ids': ids
+                'ids': ids,
+                'n_results': n_results,
+                'distance_threshold': distance_threshold,
             }
 
         except Exception as e:
@@ -458,7 +462,9 @@ class RagConfigService:
                 'documents': [],
                 'metadatas': [],
                 'distances': [],
-                'ids': []
+                'ids': [],
+                'n_results': n_results,
+                'distance_threshold': distance_threshold,
             }
 
 

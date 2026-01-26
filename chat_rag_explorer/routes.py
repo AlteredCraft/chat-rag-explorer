@@ -313,6 +313,7 @@ def chat():
 
     # RAG context retrieval
     rag_context = None
+    rag_result = None
     messages_for_llm = messages
 
     if rag_enabled:
@@ -408,15 +409,17 @@ def chat():
 
             # Build RAG metadata if context was used
             rag_metadata = None
-            if rag_enabled:
+            if rag_enabled and rag_result:
                 rag_metadata = {
                     "enabled": True,
                     "documents_retrieved": len(rag_context["documents"]) if rag_context else 0,
-                    "collection": rag_context.get("collection") if rag_context else None,
+                    "collection": rag_result.get("collection"),
                     "documents": rag_context.get("documents", []) if rag_context else [],
                     "metadatas": rag_context.get("metadatas", []) if rag_context else [],
                     "distances": rag_context.get("distances", []) if rag_context else [],
                     "ids": rag_context.get("ids", []) if rag_context else [],
+                    "n_results": rag_result.get("n_results"),
+                    "distance_threshold": rag_result.get("distance_threshold"),
                 }
 
             entry_data = {
@@ -470,15 +473,17 @@ def chat():
 
             # Build RAG metadata for error case
             rag_metadata_err = None
-            if rag_enabled:
+            if rag_enabled and rag_result:
                 rag_metadata_err = {
                     "enabled": True,
                     "documents_retrieved": len(rag_context["documents"]) if rag_context else 0,
-                    "collection": rag_context.get("collection") if rag_context else None,
+                    "collection": rag_result.get("collection"),
                     "documents": rag_context.get("documents", []) if rag_context else [],
                     "metadatas": rag_context.get("metadatas", []) if rag_context else [],
                     "distances": rag_context.get("distances", []) if rag_context else [],
                     "ids": rag_context.get("ids", []) if rag_context else [],
+                    "n_results": rag_result.get("n_results"),
+                    "distance_threshold": rag_result.get("distance_threshold"),
                 }
 
             entry_data = {

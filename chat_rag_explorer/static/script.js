@@ -281,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         // Restore RAG context display if present in metadata
                         const meta = messageMetadata[displayIndex];
-                        if (meta && meta.rag && meta.rag.documents_retrieved > 0) {
+                        if (meta && meta.rag && meta.rag.enabled) {
                             const ragContainer = document.getElementById(`rag-context-${displayIndex}`);
                             if (ragContainer) {
                                 ragContainer.innerHTML = renderRagContext(meta.rag);
@@ -751,8 +751,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (receivedMetadata) {
                         saveMessageMetadata(assistantMsgIndex, receivedMetadata);
 
-                        // Display RAG context if present
-                        if (receivedMetadata.rag && receivedMetadata.rag.documents_retrieved > 0) {
+                        // Display RAG context if RAG was used
+                        if (receivedMetadata.rag && receivedMetadata.rag.enabled) {
                             updateMessageRagContext(assistantMsgIndex, receivedMetadata.rag);
                         }
                     }
@@ -1018,13 +1018,39 @@ document.addEventListener('DOMContentLoaded', () => {
         html += '</div>';
 
         // RAG Documents section (if RAG was used)
-        if (metadata.rag && metadata.rag.documents && metadata.rag.documents.length > 0) {
-            const docCount = metadata.rag.documents.length;
+        if (metadata.rag && metadata.rag.enabled) {
+            const documents = metadata.rag.documents || [];
+            const docCount = documents.length;
             const collectionName = metadata.rag.collection || 'Unknown';
+            const nResults = metadata.rag.n_results;
+            const distanceThreshold = metadata.rag.distance_threshold;
+
             html += '<div class="details-section">';
             html += `<div class="details-section-header">Retrieved Documents <span class="msg-count">(${docCount} from ${escapeHtml(collectionName)})</span></div>`;
 
-            metadata.rag.documents.forEach((doc, i) => {
+            // Settings summary line
+            const thresholdDisplay = distanceThreshold != null ? distanceThreshold : 'None';
+            html += '<div class="details-rag-settings">';
+            html += `<span>Results requested: <strong>${nResults}</strong></span>`;
+            html += `<span>Distance threshold: <strong>${thresholdDisplay}</strong></span>`;
+            html += '</div>';
+
+            // Callout when fewer results than requested
+            if (docCount < nResults) {
+                if (docCount === 0) {
+                    const thresholdNote = distanceThreshold != null
+                        ? ` (\u2264 ${distanceThreshold})`
+                        : '';
+                    html += `<div class="details-rag-callout">No documents matched within the distance threshold${thresholdNote}.</div>`;
+                } else {
+                    const thresholdNote = distanceThreshold != null
+                        ? ` (\u2264 ${distanceThreshold})`
+                        : '';
+                    html += `<div class="details-rag-callout">Only ${docCount} of ${nResults} requested documents were within the distance threshold${thresholdNote}.</div>`;
+                }
+            }
+
+            documents.forEach((doc, i) => {
                 const meta = metadata.rag.metadatas && metadata.rag.metadatas[i] ? metadata.rag.metadatas[i] : {};
                 const distance = metadata.rag.distances && metadata.rag.distances[i] !== undefined
                     ? metadata.rag.distances[i].toFixed(4)
@@ -1164,16 +1190,21 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Render RAG context as a simple label.
      * Full document content is visible in "View Details" modal.
+     * Shows label even when 0 documents returned so users know RAG was attempted.
      * @param {Object} ragData - RAG metadata from response
      * @returns {string} HTML string for the RAG context label
      */
     function renderRagContext(ragData) {
-        if (!ragData || !ragData.documents || ragData.documents.length === 0) {
+        if (!ragData || !ragData.enabled) {
             return '';
         }
 
-        const docCount = ragData.documents.length;
+        const docCount = ragData.documents ? ragData.documents.length : 0;
         const collection = escapeHtml(ragData.collection || 'knowledge base');
+
+        if (docCount === 0) {
+            return `<div class="rag-context-label">0 documents retrieved from <strong>${collection}</strong></div>`;
+        }
 
         return `<div class="rag-context-label">Retrieved ${docCount} document(s) from <strong>${collection}</strong></div>`;
     }
@@ -1185,7 +1216,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function updateMessageRagContext(msgIndex, ragData) {
         const container = document.getElementById(`rag-context-${msgIndex}`);
-        if (container && ragData && ragData.documents_retrieved > 0) {
+        if (container && ragData && ragData.enabled) {
             container.innerHTML = renderRagContext(ragData);
             AppLogger.debug('RAG context displayed', {
                 msgIndex,
