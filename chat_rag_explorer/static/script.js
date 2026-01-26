@@ -1074,7 +1074,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (meta.section_title) metaFields.push(`Section: ${meta.section_title}`);
                 if (meta.section_number) metaFields.push(`#${meta.section_number}`);
                 if (meta.author) metaFields.push(`Author: ${meta.author}`);
-                if (meta.url) metaFields.push(`<a href="${escapeHtml(meta.url)}" target="_blank" rel="noopener">Source</a>`);
+                const safeUrl = meta.url ? sanitizeUrl(meta.url) : '';
+                if (safeUrl) metaFields.push(`<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">Source</a>`);
 
                 if (metaFields.length > 0) {
                     html += `<div class="details-rag-meta">${metaFields.join(' · ')}</div>`;
@@ -1168,6 +1169,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Helper to sanitize URLs - only allow safe protocols
+    function sanitizeUrl(url) {
+        try {
+            const parsed = new URL(url);
+            if (['http:', 'https:'].includes(parsed.protocol)) {
+                return url;
+            }
+        } catch (e) {
+            // Invalid URL
+        }
+        return '';
     }
 
     // Helper to truncate text
