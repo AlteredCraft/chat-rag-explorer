@@ -1,3 +1,8 @@
+---
+section_number: 15
+section_title: "Chapter 15: The Crew Assembles"
+title: The Morn Chronicles
+---
 # Chapter 15: The Crew Assembles
 
 The safehouse occupied the third floor of a decommissioned water treatment facility on Korva Minor, a neutral world whose principal industry was looking the other way. Morn climbed the service stairs through the smell of rust and chemical residue, each step echoing in the vertical shaft like a countdown.

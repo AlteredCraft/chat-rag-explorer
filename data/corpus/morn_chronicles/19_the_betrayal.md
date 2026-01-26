@@ -1,3 +1,8 @@
+---
+section_number: 19
+section_title: "Chapter 19: The Betrayal"
+title: The Morn Chronicles
+---
 # Chapter 19: The Betrayal
 
 Morn woke to the sensation of being watched.

@@ -1,3 +1,8 @@
+---
+section_number: 25
+section_title: "Chapter 25: The Celestial Temple"
+title: The Morn Chronicles
+---
 # Chapter 25: The Celestial Temple
 
 The station shuddered.

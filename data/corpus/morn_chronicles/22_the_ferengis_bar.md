@@ -1,3 +1,8 @@
+---
+section_number: 22
+section_title: "Chapter 22: The Ferengi's Bar"
+title: The Morn Chronicles
+---
 # Chapter 22: The Ferengi's Bar
 
 The seat at the end of the bar had a slight depression worn into it. Not enough that anyone would notice—not consciously—but enough that when Morn settled onto it, his weight found familiar grooves. The stool had molded itself to him, or perhaps he had molded himself to it. Either way, the fit was perfect.

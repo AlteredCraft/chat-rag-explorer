@@ -1,3 +1,8 @@
+---
+section_number: 24
+section_title: "Chapter 24: The Stool"
+title: The Morn Chronicles
+---
 # Chapter 24: The Stool
 
 The stool was nothing special. Standard Cardassian manufacture, repurposed from a mining station's mess hall, its surface worn smooth by countless occupants over the years. The seat had a slight depression in the center where generations of tired workers had rested their weight. One of the three legs was fractionally shorter than the others, creating an almost imperceptible wobble that Morn had learned to compensate for by shifting his bulk slightly to the left.

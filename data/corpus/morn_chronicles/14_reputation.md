@@ -1,3 +1,8 @@
+---
+section_number: 14
+section_title: "Chapter 14: Reputation"
+title: The Morn Chronicles
+---
 # Chapter 14: Reputation
 
 The Bolian freighter captain had been talking for three hours.

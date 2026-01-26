@@ -1,3 +1,8 @@
+---
+section_number: 11
+section_title: "Chapter 11: The Lonely Hauler"
+title: The Morn Chronicles
+---
 # Chapter 11: The Lonely Hauler
 
 The *Patient Ear* hummed through the void between Tellar Prime and the Rigel system, a journey of seventeen days at her comfortable cruising speed. Morn had made this run before—knew every dead spot where subspace communications faded to static, every waypoint where the stars shifted from familiar to foreign. He knew the route the way he knew the worn patches on his command chair, the slight list to port when the inertial dampeners cycled through their maintenance routine, the exact temperature at which the recycled air carried a faint metallic taste.

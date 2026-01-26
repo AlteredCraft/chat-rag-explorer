@@ -1,3 +1,8 @@
+---
+section_number: 18
+section_title: "Chapter 18: One Thousand Bricks"
+title: The Morn Chronicles
+---
 # Chapter 18: One Thousand Bricks
 
 The weight was wrong.

@@ -1,3 +1,8 @@
+---
+section_number: 9
+section_title: "Chapter 9: Off-World"
+title: The Morn Chronicles
+---
 # Chapter 9: Off-World
 
 The path to his mother's chambers wound through the oldest section of Galorum Warren, where the stone had been worn smooth by three centuries of Lurian feet. Morn walked it slowly, his hand trailing along the wall as it had when he was a child. The texture was different now—not rougher, but somehow more familiar, as if his fingers had memorized every depression and ridge without his knowing.

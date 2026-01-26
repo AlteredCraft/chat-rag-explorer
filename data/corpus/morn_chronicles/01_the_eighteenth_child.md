@@ -1,3 +1,8 @@
+---
+section_number: 1
+section_title: "Chapter 1: The Eighteenth Child"
+title: The Morn Chronicles
+---
 # Chapter 1: The Eighteenth Child
 
 The screaming had stopped, which meant it was almost over.

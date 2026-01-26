@@ -1,3 +1,8 @@
+---
+section_number: 12
+section_title: "Chapter 12: Regulars and Rogues"
+title: The Morn Chronicles
+---
 # Chapter 12: Regulars and Rogues
 
 The crate weighed more than it should have for something Lady Vestris described as "a small ceremonial piece." Morn loaded it into his cargo hold with the careful attention he gave all of her shipments—which was to say, he didn't look too closely at the contents, didn't ask questions about provenance, and made absolutely certain nothing got scratched.

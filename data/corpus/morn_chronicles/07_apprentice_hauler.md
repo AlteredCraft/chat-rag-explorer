@@ -1,3 +1,8 @@
+---
+section_number: 7
+section_title: "Chapter 7: Apprentice Hauler"
+title: The Morn Chronicles
+---
 # Chapter 7: Apprentice Hauler
 
 The *Steady Burden* smelled of recycled air and cold metal. Morn noticed it the moment he stepped through the airlock—that particular staleness that clung to ships which spent more time in the void than in dock. It wasn't unpleasant exactly, just different. Final. The smell of a life chosen.

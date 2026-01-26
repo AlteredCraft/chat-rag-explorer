@@ -1,3 +1,8 @@
+---
+section_number: 28
+section_title: "Chapter 28: The Joke"
+title: The Morn Chronicles
+---
 # Chapter 28: The Joke
 
 ## 2374

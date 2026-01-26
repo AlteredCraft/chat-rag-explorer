@@ -1,3 +1,8 @@
+---
+section_number: 17
+section_title: "Chapter 17: The Mother's Day Job"
+title: The Morn Chronicles
+---
 # Chapter 17: The Mother's Day Job
 
 The Central Bank of Lissepia rose from the plaza like a monument to institutional confidence. Columns of polished darkstone. Doors of hammered bronze depicting the Five Founding Mothers. Windows narrow as knife wounds, positioned too high to breach.

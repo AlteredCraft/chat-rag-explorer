@@ -1,3 +1,8 @@
+---
+section_number: 26
+section_title: "Chapter 26: Wartime"
+title: The Morn Chronicles
+---
 # Chapter 26: Wartime
 
 The war announced itself in whispers before it arrived in weapons fire.

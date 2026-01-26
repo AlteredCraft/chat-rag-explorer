@@ -1,3 +1,8 @@
+---
+section_number: 27
+section_title: "Chapter 27: After the Storm"
+title: The Morn Chronicles
+---
 # Chapter 27: After the Storm
 
 The war ended not with a thunderclap but with a slow exhale.

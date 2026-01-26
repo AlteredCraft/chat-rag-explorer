@@ -1,3 +1,8 @@
+---
+section_number: 8
+section_title: "Chapter 8: The Old Routes"
+title: The Morn Chronicles
+---
 # Chapter 8: The Old Routes
 
 ## I. Earth, 2255

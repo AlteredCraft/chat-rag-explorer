@@ -1,3 +1,8 @@
+---
+section_number: 6
+section_title: "Chapter 6: First Molt"
+title: The Morn Chronicles
+---
 # Chapter 6: First Molt
 
 ## BEFORE

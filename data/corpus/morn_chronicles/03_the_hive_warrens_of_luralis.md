@@ -1,3 +1,8 @@
+---
+section_number: 3
+section_title: "Chapter 3: The Hive-Warrens of Luralis"
+title: The Morn Chronicles
+---
 # Chapter 3: The Hive-Warrens of Luralis
 
 The morning light filtered through the crystalline skylights of Galorum Warren, casting prismatic patterns across the sleeping chamber's earthen walls. Morn lay awake in his alcove, watching the colors shift and dance, his hearts racing with anticipation. Today was the day. Today, for the first time in his thirteen years of existence, he would venture beyond the familiar tunnels and bridges of their family compound into the legendary sprawl of Luralis itself.

@@ -1,3 +1,8 @@
+---
+section_number: 4
+section_title: "Chapter 4: Stomach Lessons"
+title: The Morn Chronicles
+---
 # Chapter 4: Stomach Lessons
 
 The training room smelled of dried herbs and something sharp that made Morn's nose twitch. He sat on a cushion that was too big for him, his legs dangling over the edge, watching his sister Prenna arrange her teaching aids on the low table between them.

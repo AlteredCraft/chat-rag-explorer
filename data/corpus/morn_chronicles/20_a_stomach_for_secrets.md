@@ -1,3 +1,8 @@
+---
+section_number: 20
+section_title: "Chapter 20: A Stomach for Secrets"
+title: The Morn Chronicles
+---
 # Chapter 20: A Stomach for Secrets
 
 The *Patient Ear* dropped out of warp in an unnamed system, and Morn immediately began scanning for other vessels. Nothing. Just rocks and radiation and the distant cold light of a dying star.

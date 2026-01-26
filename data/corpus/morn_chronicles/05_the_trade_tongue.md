@@ -1,3 +1,8 @@
+---
+section_number: 5
+section_title: "Chapter 5: The Trade Tongue"
+title: The Morn Chronicles
+---
 # Chapter 5: The Trade Tongue
 
 The trading hall of the Galorum Warren smelled of dried kelp and old data pads. Morn sat at one of the long stone tables, his still-tender post-molt skin itching against the woven seat cushion. Across from him, his eldest sister Kellura arranged a series of cargo manifests with the precision of a military strategist planning an invasion.

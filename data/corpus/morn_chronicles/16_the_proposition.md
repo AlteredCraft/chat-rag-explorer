@@ -1,3 +1,8 @@
+---
+section_number: 16
+section_title: "Chapter 16: The Proposition"
+title: The Morn Chronicles
+---
 # Chapter 16: The Proposition
 
 The safehouse smelled of recycled air and old metal. Three rooms carved into the industrial sector of Lissepia Prime, beneath a decommissioned processing plant whose permits had been falsified so many times that no authority could trace ownership. Hain had chosen it precisely for that reason—the bureaucratic entropy of a place forgotten by every system that might have cared.

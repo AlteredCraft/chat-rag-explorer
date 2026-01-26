@@ -1,3 +1,8 @@
+---
+section_number: 13
+section_title: "Chapter 13: The Ferengi Connection"
+title: The Morn Chronicles
+---
 # Chapter 13: The Ferengi Connection
 
 The rain on Ferenginar fell in sheets so thick that Morn sometimes wondered if the planet had simply decided to become an ocean and was working its way there one storm at a time. He stood under the awning of a commerce exchange, watching rivers cascade down the street while Ferengi splashed past in their waterproof boots, not even glancing up. To them, this was just weather. To Morn, it was a kind of miracle—a world so committed to its own nature that it refused to apologize for drowning its visitors.

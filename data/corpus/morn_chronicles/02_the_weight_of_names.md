@@ -1,3 +1,8 @@
+---
+section_number: 2
+section_title: "Chapter 2: The Weight of Names"
+title: The Morn Chronicles
+---
 # Chapter 2: The Weight of Names
 
 The Hall of Names smelled of stone dust and centuries.

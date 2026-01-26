@@ -1,3 +1,8 @@
+---
+section_number: 23
+section_title: "Chapter 23: The Occupation Ends"
+title: The Morn Chronicles
+---
 # Chapter 23: The Occupation Ends
 
 The evacuation began at 0400 hours, though Morn had been awake for two days.

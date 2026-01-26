@@ -1,3 +1,8 @@
+---
+section_number: 10
+section_title: "Chapter 10: Independence"
+title: The Morn Chronicles
+---
 # Chapter 10: Independence
 
 The Patient Ear was not much of a ship.
