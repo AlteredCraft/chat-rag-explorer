@@ -152,10 +152,40 @@
                                         <!-- Local Mode Settings -->
                                         <div id="rag-local-settings" class="rag-mode-section">
                                             <div class="setting-item">
-                                                <label for="rag-local-path" class="required-label">ChromaDB Path <span class="required-asterisk">*</span></label>
-                                                <input type="text" id="rag-local-path" class="text-input"
-                                                       placeholder="/path/to/chromadb" required>
-                                                <div id="rag-path-status" class="validation-status"></div>
+                                                <label class="required-label">
+                                                    ChromaDB Path <span class="required-asterisk">*</span>
+                                                    <button type="button" id="rag-path-mode-toggle" class="path-mode-toggle">
+                                                        Switch to manual entry
+                                                    </button>
+                                                </label>
+
+                                                <!-- Select Mode (default) -->
+                                                <div id="rag-path-select-mode" class="path-mode-section">
+                                                    <div class="select-wrapper">
+                                                        <select id="rag-local-select" class="text-input">
+                                                            <option value="">Scanning ./data/ for databases...</option>
+                                                        </select>
+                                                        <span id="rag-select-loading" class="loading-indicator"></span>
+                                                    </div>
+                                                    <span class="field-hint" id="rag-select-hint">
+                                                        Looking in: ./data/* subdirectories
+                                                    </span>
+                                                    <div id="rag-select-help" class="help-message" style="display: none;">
+                                                        <strong>No ChromaDB databases found in ./data/</strong>
+                                                        <br><br>
+                                                        See <code>utils/README.md</code> for instructions on creating a database.
+                                                        <br><br>
+                                                        Quick start: <code>uv run utils/ingest.py</code>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Manual Mode (hidden by default) -->
+                                                <div id="rag-path-manual-mode" class="path-mode-section" style="display: none;">
+                                                    <input type="text" id="rag-local-path" class="text-input"
+                                                           placeholder="/path/to/chromadb" required>
+                                                    <span class="field-hint">Enter the absolute path to a ChromaDB database directory</span>
+                                                    <div id="rag-path-status" class="validation-status"></div>
+                                                </div>
                                             </div>
                                         </div>
 

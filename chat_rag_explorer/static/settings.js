@@ -623,6 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ===== RAG Settings Functions =====
 
     const RAG_CONFIG_KEY = 'chat-rag-rag-config';
+    const RAG_PATH_MODE_KEY = 'chat-rag-path-mode';  // Track user's preference for select vs manual mode
 
     // DOM Elements
     const ragModeRadios = document.querySelectorAll('input[name="rag-mode"]');
@@ -631,6 +632,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const ragCloudSettings = document.getElementById('rag-cloud-settings');
     const ragLocalPath = document.getElementById('rag-local-path');
     const ragPathStatus = document.getElementById('rag-path-status');
+
+    // New elements for database discovery
+    const ragPathModeToggle = document.getElementById('rag-path-mode-toggle');
+    const ragPathSelectMode = document.getElementById('rag-path-select-mode');
+    const ragPathManualMode = document.getElementById('rag-path-manual-mode');
+    const ragLocalSelect = document.getElementById('rag-local-select');
+    const ragSelectLoading = document.getElementById('rag-select-loading');
+    const ragSelectHint = document.getElementById('rag-select-hint');
+    const ragSelectHelp = document.getElementById('rag-select-help');
     const ragServerHost = document.getElementById('rag-server-host');
     const ragServerPort = document.getElementById('rag-server-port');
     const ragTenantId = document.getElementById('rag-tenant-id');
@@ -663,6 +673,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let originalRagConfig = null;
     let pathValidateTimeout = null;
     let availableCollections = [];
+    let isManualPathMode = false; // Track whether we're in manual path mode
+    let discoveredDatabases = []; // Store discovered databases
 
     function getSelectedRagMode() {
         const selected = document.querySelector('input[name="rag-mode"]:checked');
@@ -689,8 +701,140 @@ document.addEventListener('DOMContentLoaded', () => {
             loadApiKeyStatus();
         }
 
+        // Discover databases when switching to local mode
+        if (mode === 'local' && !isManualPathMode) {
+            discoverDatabases();
+        }
+
         updateRagSaveButtonState();
         SettingsLogger.debug('RAG mode toggled', { mode });
+    }
+
+    async function discoverDatabases() {
+        SettingsLogger.info('Discovering ChromaDB databases');
+
+        // Show loading state
+        if (ragSelectLoading) ragSelectLoading.style.display = 'inline-block';
+        if (ragLocalSelect) {
+            ragLocalSelect.innerHTML = '<option value="">Scanning ./data/ for databases...</option>';
+            ragLocalSelect.disabled = true;
+        }
+
+        try {
+            const response = await fetch('/api/rag/discover-databases');
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Failed to discover databases');
+            }
+
+            discoveredDatabases = data.databases || [];
+            SettingsLogger.info(`Discovered ${discoveredDatabases.length} database(s)`, { databases: discoveredDatabases });
+
+            // Update the select element
+            if (ragLocalSelect) {
+                ragLocalSelect.innerHTML = '';
+
+                if (discoveredDatabases.length === 0) {
+                    // No databases found
+                    ragLocalSelect.innerHTML = '<option value="">No databases found</option>';
+                    ragLocalSelect.disabled = true;
+
+                    // Show help message
+                    if (ragSelectHelp) ragSelectHelp.style.display = 'block';
+                    if (ragSelectHint) ragSelectHint.style.display = 'none';
+                } else {
+                    // Add placeholder option
+                    const placeholderOption = document.createElement('option');
+                    placeholderOption.value = '';
+                    placeholderOption.textContent = 'Select a database...';
+                    ragLocalSelect.appendChild(placeholderOption);
+
+                    // Add discovered databases
+                    discoveredDatabases.forEach(db => {
+                        const option = document.createElement('option');
+                        option.value = db.path;
+
+                        // Create descriptive text with folder icon
+                        let text = '📁 ' + db.name;
+                        if (db.collection_count !== null) {
+                            text += ` (${db.collection_count} collection${db.collection_count !== 1 ? 's' : ''})`;
+                        }
+                        if (db.is_current) {
+                            text += ' [current]';
+                        }
+
+                        option.textContent = text;
+                        ragLocalSelect.appendChild(option);
+                    });
+
+                    ragLocalSelect.disabled = false;
+
+                    // Hide help message, show hint
+                    if (ragSelectHelp) ragSelectHelp.style.display = 'none';
+                    if (ragSelectHint) ragSelectHint.style.display = 'block';
+
+                    // If there's a current path that matches one of the discovered databases, select it
+                    const currentPath = originalRagConfig?.local_path;
+                    if (currentPath) {
+                        const matchingDb = discoveredDatabases.find(db =>
+                            db.path === currentPath || db.path === currentPath.replace(/\\/g, '/')
+                        );
+                        if (matchingDb) {
+                            ragLocalSelect.value = matchingDb.path;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            SettingsLogger.error('Failed to discover databases', { error: error.message });
+            if (ragLocalSelect) {
+                ragLocalSelect.innerHTML = '<option value="">Error loading databases</option>';
+                ragLocalSelect.disabled = true;
+            }
+        } finally {
+            if (ragSelectLoading) ragSelectLoading.style.display = 'none';
+        }
+    }
+
+    function togglePathMode() {
+        isManualPathMode = !isManualPathMode;
+
+        // Save the user's preference
+        localStorage.setItem(RAG_PATH_MODE_KEY, isManualPathMode ? 'manual' : 'select');
+
+        if (isManualPathMode) {
+            // Switch to manual mode
+            if (ragPathSelectMode) ragPathSelectMode.style.display = 'none';
+            if (ragPathManualMode) ragPathManualMode.style.display = 'block';
+            if (ragPathModeToggle) ragPathModeToggle.textContent = 'Switch to database selector';
+
+            // If a database was selected, populate the manual input
+            if (ragLocalSelect && ragLocalSelect.value && ragLocalPath) {
+                ragLocalPath.value = ragLocalSelect.value;
+            }
+        } else {
+            // Switch to select mode
+            if (ragPathSelectMode) ragPathSelectMode.style.display = 'block';
+            if (ragPathManualMode) ragPathManualMode.style.display = 'none';
+            if (ragPathModeToggle) ragPathModeToggle.textContent = 'Switch to manual entry';
+
+            // Refresh database list
+            discoverDatabases();
+
+            // If the manual path matches a discovered database, select it
+            if (ragLocalPath && ragLocalPath.value && discoveredDatabases.length > 0) {
+                const matchingDb = discoveredDatabases.find(db =>
+                    db.path === ragLocalPath.value || db.path === ragLocalPath.value.replace(/\\/g, '/')
+                );
+                if (matchingDb && ragLocalSelect) {
+                    ragLocalSelect.value = matchingDb.path;
+                }
+            }
+        }
+
+        updateRagSaveButtonState();
+        SettingsLogger.debug('Path mode toggled', { isManual: isManualPathMode });
     }
 
     async function loadRagConfig() {
@@ -720,7 +864,40 @@ document.addEventListener('DOMContentLoaded', () => {
             ragDistanceSlider.value = threshold;
             ragDistanceValue.textContent = threshold === 0 ? 'Off' : threshold.toFixed(1);
 
+            // Load saved mode preference from localStorage
+            const savedMode = localStorage.getItem(RAG_PATH_MODE_KEY);
+            if (savedMode === 'manual') {
+                isManualPathMode = true;
+                // Apply manual mode UI state
+                if (ragPathSelectMode) ragPathSelectMode.style.display = 'none';
+                if (ragPathManualMode) ragPathManualMode.style.display = 'block';
+                if (ragPathModeToggle) ragPathModeToggle.textContent = 'Switch to database selector';
+            } else {
+                // Default to select mode (including when no preference is saved)
+                isManualPathMode = false;
+                if (ragPathSelectMode) ragPathSelectMode.style.display = 'block';
+                if (ragPathManualMode) ragPathManualMode.style.display = 'none';
+                if (ragPathModeToggle) ragPathModeToggle.textContent = 'Switch to manual entry';
+            }
+
             toggleRagMode();
+
+            // If in local mode and select mode, discover databases and try to select the current one
+            if (originalRagConfig.mode === 'local' && !isManualPathMode) {
+                await discoverDatabases();
+                // Try to select the current database if it was discovered
+                if (originalRagConfig.local_path && ragLocalSelect) {
+                    const matchingDb = discoveredDatabases.find(db =>
+                        db.path === originalRagConfig.local_path ||
+                        db.path === originalRagConfig.local_path.replace(/\\/g, '/')
+                    );
+                    if (matchingDb) {
+                        ragLocalSelect.value = matchingDb.path;
+                    }
+                    // Note: We no longer auto-switch to manual mode if database not found
+                    // User can manually switch if needed
+                }
+            }
 
             // If a collection was previously saved, restore the collection selector state
             if (originalRagConfig.collection) {
@@ -814,7 +991,16 @@ document.addEventListener('DOMContentLoaded', () => {
         let isValid = true;
 
         if (mode === 'local') {
-            isValid = validateRequiredField(ragLocalPath, 'ChromaDB path is required');
+            // Check the appropriate field based on select vs manual mode
+            if (isManualPathMode) {
+                isValid = validateRequiredField(ragLocalPath, 'ChromaDB path is required');
+            } else {
+                // In select mode, check if a database is selected
+                if (!ragLocalSelect || !ragLocalSelect.value.trim()) {
+                    ragTestResult.innerHTML = '<div class="test-error"><strong>Please select a database</strong></div>';
+                    return;
+                }
+            }
         } else if (mode === 'server') {
             isValid = validateRequiredField(ragServerHost, 'Host is required') && isValid;
             isValid = validateRequiredField(ragServerPort, 'Port is required') && isValid;
@@ -884,7 +1070,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
             ragCollectionSection.style.display = 'none';
         } finally {
-            ragTestBtn.disabled = false;
+            // Restore button state based on form validity
+            const isValid = validateRagForm();
+            ragTestBtn.disabled = !isValid;
             ragTestBtn.innerHTML = '<span class="btn-icon">&#x2192;</span> Test Connection';
             updateWizardFromState();
         }
@@ -916,9 +1104,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const distanceVal = parseFloat(ragDistanceSlider.value);
         const distanceThreshold = distanceVal === 0 ? null : distanceVal;
 
+        // Get local path from select or manual input depending on mode
+        let localPath = '';
+        if (getSelectedRagMode() === 'local') {
+            if (isManualPathMode) {
+                localPath = ragLocalPath.value.trim();
+            } else {
+                localPath = ragLocalSelect ? ragLocalSelect.value : '';
+            }
+        }
+
         return {
             mode: getSelectedRagMode(),
-            local_path: ragLocalPath.value.trim(),
+            local_path: localPath,
             server_host: ragServerHost.value.trim(),
             server_port: parseInt(ragServerPort.value) || 8000,
             cloud_tenant: ragTenantId.value.trim(),
@@ -946,7 +1144,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function validateRagForm() {
         const mode = getSelectedRagMode();
         if (mode === 'local') {
-            return ragLocalPath.value.trim().length > 0;
+            // Check the appropriate field based on select vs manual mode
+            if (isManualPathMode) {
+                return ragLocalPath.value.trim().length > 0;
+            } else {
+                // In select mode, check if a database is selected
+                return ragLocalSelect && ragLocalSelect.value.trim().length > 0;
+            }
         } else if (mode === 'server') {
             return ragServerHost.value.trim().length > 0 && ragServerPort.value;
         } else if (mode === 'cloud') {
@@ -1052,6 +1256,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const hasChanges = hasRagConfigChanges();
         const isValid = validateRagForm();
         ragSaveBtn.disabled = !hasChanges || !isValid;
+
+        // Also update the test button state based on form validity
+        ragTestBtn.disabled = !isValid;
 
         // Update badge visibility and button state for unsaved changes
         if (ragSaveBadge) {
@@ -1223,6 +1430,18 @@ document.addEventListener('DOMContentLoaded', () => {
     ragModeRadios.forEach(radio => {
         radio.addEventListener('change', toggleRagMode);
     });
+
+    // New event listeners for database discovery
+    if (ragPathModeToggle) {
+        ragPathModeToggle.addEventListener('click', togglePathMode);
+    }
+
+    if (ragLocalSelect) {
+        ragLocalSelect.addEventListener('change', () => {
+            onConnectionParamChange();
+            updateRagSaveButtonState();
+        });
+    }
 
     function onConnectionParamChange() {
         // Hide collection section when connection parameters change

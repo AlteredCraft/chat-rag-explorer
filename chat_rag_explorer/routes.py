@@ -569,7 +569,7 @@ def save_rag_config():
             return jsonify(result), 400
 
         logger.info(f"[{request_id}] POST /api/rag/config - Saved ({elapsed:.3f}s)")
-        return jsonify({"data": result['config']})
+        return jsonify(result)
     except Exception as e:
         elapsed = time.time() - start_time
         logger.error(f"[{request_id}] POST /api/rag/config - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
@@ -630,6 +630,24 @@ def get_rag_api_key_status():
     except Exception as e:
         logger.error(f"[{request_id}] GET /api/rag/api-key-status - Failed: {str(e)}", exc_info=True)
         return jsonify({"configured": False, "masked": None}), 500
+
+
+@main_bp.route("/api/rag/discover-databases")
+def discover_rag_databases():
+    """GET - Discover ChromaDB databases in ./data/ directory."""
+    request_id = generate_request_id()
+    start_time = time.time()
+    logger.info(f"[{request_id}] GET /api/rag/discover-databases - Discovering databases")
+
+    try:
+        result = rag_config_service.discover_databases(request_id)
+        elapsed = time.time() - start_time
+        logger.info(f"[{request_id}] GET /api/rag/discover-databases - Found {len(result.get('databases', []))} database(s) ({elapsed:.3f}s)")
+        return jsonify(result)
+    except Exception as e:
+        elapsed = time.time() - start_time
+        logger.error(f"[{request_id}] GET /api/rag/discover-databases - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
+        return jsonify({"success": False, "databases": [], "error": str(e)}), 500
 
 
 @main_bp.route("/api/rag/sample", methods=["POST"])
