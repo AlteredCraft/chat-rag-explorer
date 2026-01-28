@@ -1,5 +1,5 @@
 ---
-title: "The Word "Hacker""
+title: "The Word 'Hacker'"
 author: "Paul Graham"
 date: "April 2004"
 tags: ["programming"]
