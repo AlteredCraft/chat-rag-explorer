@@ -6,6 +6,7 @@ ChromaDB client creation is mocked to avoid network calls.
 """
 import json
 import pytest
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 from chat_rag_explorer.rag_config_service import RagConfigService, DEFAULT_RAG_CONFIG
 
@@ -391,7 +392,7 @@ class TestDiscoverDatabases:
         # Make data directory not exist
         fake_project = tmp_path / "fake_project"
         monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path",
-                          lambda x: fake_project / x.split('/')[-1])
+                          lambda x: fake_project / Path(x).name)
 
         result = service.discover_databases()
 
@@ -407,9 +408,10 @@ class TestDiscoverDatabases:
 
         # Mock the path resolution to use our temp directory
         def mock_path(path_str):
-            if "rag_config_service.py" in path_str:
+            p = Path(path_str)
+            if p.name == "rag_config_service.py":
                 return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
-            return Path(path_str)
+            return p
 
         monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
 
@@ -431,9 +433,10 @@ class TestDiscoverDatabases:
 
         # Mock path resolution
         def mock_path(path_str):
-            if "rag_config_service.py" in path_str:
+            p = Path(path_str)
+            if p.name == "rag_config_service.py":
                 return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
-            return Path(path_str)
+            return p
 
         monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
 
@@ -464,9 +467,10 @@ class TestDiscoverDatabases:
 
         # Mock path resolution
         def mock_path(path_str):
-            if "rag_config_service.py" in path_str:
+            p = Path(path_str)
+            if p.name == "rag_config_service.py":
                 return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
-            return Path(path_str)
+            return p
 
         monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
 
@@ -496,9 +500,10 @@ class TestDiscoverDatabases:
 
         # Mock path resolution
         def mock_path(path_str):
-            if "rag_config_service.py" in path_str:
+            p = Path(path_str)
+            if p.name == "rag_config_service.py":
                 return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
-            return Path(path_str)
+            return p
 
         monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
 
@@ -530,9 +535,10 @@ class TestDiscoverDatabases:
 
         # Mock path resolution
         def mock_path(path_str):
-            if "rag_config_service.py" in path_str:
+            p = Path(path_str)
+            if p.name == "rag_config_service.py":
                 return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
-            return Path(path_str)
+            return p
 
         monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
 
@@ -559,9 +565,10 @@ class TestDiscoverDatabases:
 
         # Mock path resolution
         def mock_path(path_str):
-            if "rag_config_service.py" in path_str:
+            p = Path(path_str)
+            if p.name == "rag_config_service.py":
                 return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
-            return Path(path_str)
+            return p
 
         monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
 
