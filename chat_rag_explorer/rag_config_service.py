@@ -178,6 +178,97 @@ class RagConfigService:
             'details': {'exists': True, 'is_directory': True, 'has_database': True}
         }
 
+    def discover_databases(self, request_id=None):
+        """
+        Discover ChromaDB databases in the ./data/ directory.
+
+        Searches for subdirectories containing chroma.sqlite3 files and returns
+        metadata about each discovered database.
+
+        Returns:
+            dict with:
+                - success: bool indicating if discovery succeeded
+                - databases: list of discovered databases with metadata
+                - search_path: where we searched
+                - current_path: currently configured database path (if any)
+        """
+        log_prefix = f"[{request_id}] " if request_id else ""
+
+        databases = []
+
+        try:
+            current_config = self.get_config(request_id)
+            current_path = current_config.get('local_path', '')
+
+            # Get the data directory (relative to project root)
+            project_root = Path(__file__).parent.parent
+            data_dir = project_root / "data"
+            if not data_dir.exists():
+                logger.info(f"{log_prefix}Data directory does not exist: {data_dir}")
+                return {
+                    'success': True,
+                    'databases': [],
+                    'search_path': './data/',
+                    'current_path': current_path
+                }
+
+            # Search for chroma.sqlite3 files in subdirectories
+            for subdir in data_dir.iterdir():
+                if not subdir.is_dir():
+                    continue
+
+                chroma_db_file = subdir / 'chroma.sqlite3'
+                if chroma_db_file.exists():
+                    try:
+                        # Get database metadata
+                        stat = chroma_db_file.stat()
+
+                        # Try to get collection count (non-blocking)
+                        collection_count = None
+                        try:
+                            client = chromadb.PersistentClient(path=str(subdir))
+                            collections = client.list_collections()
+                            collection_count = len(collections)
+                        except Exception as e:
+                            logger.debug(f"{log_prefix}Could not read collections from {subdir}: {e}")
+
+                        database_info = {
+                            'name': subdir.name,
+                            'path': str(subdir),
+                            'relative_path': f"./data/{subdir.name}",
+                            'size_bytes': stat.st_size,
+                            'size_mb': round(stat.st_size / (1024 * 1024), 2),
+                            'last_modified': stat.st_mtime,
+                            'collection_count': collection_count,
+                            'is_current': str(subdir) == current_path or str(subdir.absolute()) == current_path
+                        }
+                        databases.append(database_info)
+                        logger.debug(f"{log_prefix}Found database: {subdir.name}")
+
+                    except Exception as e:
+                        logger.warning(f"{log_prefix}Error reading database info from {subdir}: {e}")
+
+            # Sort by name for consistent ordering
+            databases.sort(key=lambda x: x['name'])
+
+            logger.info(f"{log_prefix}Discovered {len(databases)} database(s) in ./data/")
+            return {
+                'success': True,
+                'databases': databases,
+                'search_path': './data/',
+                'current_path': current_path
+            }
+
+        except Exception as e:
+            logger.error(f"{log_prefix}Database discovery failed: {e}")
+            return {
+                'success': False,
+                'databases': [],
+                'search_path': './data/',
+                'current_path': '',
+                'error': str(e)
+            }
+
     def test_connection(self, config_data, request_id=None):
         """Test ChromaDB connection with given configuration."""
         log_prefix = f"[{request_id}] " if request_id else ""

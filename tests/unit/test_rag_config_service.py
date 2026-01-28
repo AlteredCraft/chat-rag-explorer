@@ -382,6 +382,217 @@ class TestTestConnection:
         assert "unknown" in result["message"].lower()
 
 
+class TestDiscoverDatabases:
+    """Tests for discover_databases() method."""
+
+    def test_no_data_directory(self, tmp_path, monkeypatch):
+        """Returns empty list when data directory doesn't exist."""
+        service = RagConfigService()
+        # Make data directory not exist
+        fake_project = tmp_path / "fake_project"
+        monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path",
+                          lambda x: fake_project / x.split('/')[-1])
+
+        result = service.discover_databases()
+
+        assert result["success"] is True
+        assert result["databases"] == []
+        assert result["search_path"] == "./data/"
+
+    def test_empty_data_directory(self, tmp_path, monkeypatch):
+        """Returns empty list when data directory is empty."""
+        service = RagConfigService()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Mock the path resolution to use our temp directory
+        def mock_path(path_str):
+            if "rag_config_service.py" in path_str:
+                return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
+            return Path(path_str)
+
+        monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
+
+        result = service.discover_databases()
+
+        assert result["success"] is True
+        assert result["databases"] == []
+
+    def test_discovers_single_database(self, tmp_path, monkeypatch):
+        """Discovers a single ChromaDB database."""
+        service = RagConfigService()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create a fake ChromaDB database
+        db_dir = data_dir / "test_db"
+        db_dir.mkdir()
+        (db_dir / "chroma.sqlite3").write_text("fake db content")
+
+        # Mock path resolution
+        def mock_path(path_str):
+            if "rag_config_service.py" in path_str:
+                return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
+            return Path(path_str)
+
+        monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
+
+        result = service.discover_databases()
+
+        assert result["success"] is True
+        assert len(result["databases"]) == 1
+        db = result["databases"][0]
+        assert db["name"] == "test_db"
+        assert "test_db" in db["path"]
+        assert db["relative_path"] == "./data/test_db"
+        assert db["size_bytes"] > 0
+
+    def test_discovers_multiple_databases(self, tmp_path, monkeypatch):
+        """Discovers multiple ChromaDB databases."""
+        service = RagConfigService()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create multiple fake ChromaDB databases
+        for name in ["db1", "db2", "db3"]:
+            db_dir = data_dir / name
+            db_dir.mkdir()
+            (db_dir / "chroma.sqlite3").write_text(f"fake {name}")
+
+        # Create a non-database directory (should be ignored)
+        (data_dir / "not_a_db").mkdir()
+
+        # Mock path resolution
+        def mock_path(path_str):
+            if "rag_config_service.py" in path_str:
+                return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
+            return Path(path_str)
+
+        monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
+
+        result = service.discover_databases()
+
+        assert result["success"] is True
+        assert len(result["databases"]) == 3
+        names = [db["name"] for db in result["databases"]]
+        assert "db1" in names
+        assert "db2" in names
+        assert "db3" in names
+        assert "not_a_db" not in names
+
+    def test_ignores_files_in_data_dir(self, tmp_path, monkeypatch):
+        """Ignores files (non-directories) in data directory."""
+        service = RagConfigService()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create a file (should be ignored)
+        (data_dir / "readme.txt").write_text("not a directory")
+
+        # Create a valid database
+        db_dir = data_dir / "valid_db"
+        db_dir.mkdir()
+        (db_dir / "chroma.sqlite3").write_text("fake db")
+
+        # Mock path resolution
+        def mock_path(path_str):
+            if "rag_config_service.py" in path_str:
+                return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
+            return Path(path_str)
+
+        monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
+
+        result = service.discover_databases()
+
+        assert result["success"] is True
+        assert len(result["databases"]) == 1
+        assert result["databases"][0]["name"] == "valid_db"
+
+    @patch("chat_rag_explorer.rag_config_service.chromadb.PersistentClient")
+    def test_includes_collection_count(self, mock_client_class, tmp_path, monkeypatch):
+        """Includes collection count when accessible."""
+        service = RagConfigService()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        db_dir = data_dir / "test_db"
+        db_dir.mkdir()
+        (db_dir / "chroma.sqlite3").write_text("fake db")
+
+        # Mock ChromaDB client
+        mock_client = MagicMock()
+        mock_collection1 = MagicMock()
+        mock_collection1.name = "collection1"
+        mock_collection2 = MagicMock()
+        mock_collection2.name = "collection2"
+        mock_client.list_collections.return_value = [mock_collection1, mock_collection2]
+        mock_client_class.return_value = mock_client
+
+        # Mock path resolution
+        def mock_path(path_str):
+            if "rag_config_service.py" in path_str:
+                return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
+            return Path(path_str)
+
+        monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
+
+        result = service.discover_databases()
+
+        assert result["success"] is True
+        assert len(result["databases"]) == 1
+        assert result["databases"][0]["collection_count"] == 2
+
+    def test_marks_current_database(self, tmp_path, monkeypatch):
+        """Marks the currently configured database."""
+        service = RagConfigService()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create databases
+        current_db = data_dir / "current_db"
+        current_db.mkdir()
+        (current_db / "chroma.sqlite3").write_text("current")
+
+        other_db = data_dir / "other_db"
+        other_db.mkdir()
+        (other_db / "chroma.sqlite3").write_text("other")
+
+        # Mock path resolution
+        def mock_path(path_str):
+            if "rag_config_service.py" in path_str:
+                return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
+            return Path(path_str)
+
+        monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
+
+        # Mock get_config to return current_db as configured
+        monkeypatch.setattr(service, "get_config",
+                          lambda request_id=None: {"local_path": str(current_db)})
+
+        result = service.discover_databases()
+
+        assert result["success"] is True
+        current_marked = [db for db in result["databases"] if db["is_current"]]
+        assert len(current_marked) == 1
+        assert current_marked[0]["name"] == "current_db"
+
+    def test_handles_discovery_error(self, tmp_path, monkeypatch):
+        """Handles errors during discovery gracefully."""
+        service = RagConfigService()
+
+        # Mock to raise an exception
+        def mock_path(path_str):
+            raise PermissionError("Access denied")
+
+        monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
+
+        result = service.discover_databases()
+
+        assert result["success"] is False
+        assert "error" in result
+        assert result["databases"] == []
+
+
 class TestQueryCollection:
     """Tests for query_collection() method."""
 
