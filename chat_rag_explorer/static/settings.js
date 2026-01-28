@@ -126,9 +126,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const deleteModal = document.getElementById('delete-modal');
     const deleteModalCancel = document.getElementById('delete-modal-cancel');
     const deleteModalOk = document.getElementById('delete-modal-ok');
+    const resetChatModal = document.getElementById('reset-chat-modal');
+    const resetChatModalCancel = document.getElementById('reset-chat-modal-cancel');
+    const resetChatModalOk = document.getElementById('reset-chat-modal-ok');
+
+    // Session storage key for conversation (must match script.js)
+    const SESSION_HISTORY_KEY = 'chat-rag-conversation-history';
+    const SESSION_METRICS_KEY = 'chat-rag-session-metrics';
+    const SESSION_METADATA_KEY = 'chat-rag-message-metadata';
 
     let isCreatingNew = false;
     let originalPromptData = null;
+    let originalSelectedPromptId = null; // Track initial prompt selection
 
     function isFreeModel(model) {
         const pricing = model.pricing || {};
@@ -420,6 +429,11 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem(PROMPT_STORAGE_KEY, DEFAULT_PROMPT);
             SettingsLogger.info('Using default prompt (no saved selection)', { prompt: DEFAULT_PROMPT });
         }
+
+        // Track the original selection for dirty state detection
+        originalSelectedPromptId = promptSelect.value;
+        SettingsLogger.debug('Original prompt selection tracked', { originalSelectedPromptId });
+
         loadPromptIntoForm();
     }
 
@@ -464,24 +478,34 @@ document.addEventListener('DOMContentLoaded', () => {
         deletePromptBtn.disabled = isCreatingNew || isProtected;
     }
 
+    function hasPromptSelectionChanged() {
+        return promptSelect.value !== originalSelectedPromptId;
+    }
+
+    function hasPromptContentChanges() {
+        if (!originalPromptData) return false;
+        return promptTitleInput.value !== originalPromptData.title ||
+            promptDescInput.value !== (originalPromptData.description || '') ||
+            promptContentInput.value !== (originalPromptData.content || '');
+    }
+
     function updateSaveButtonState() {
         if (isCreatingNew) {
             // For new prompts, enable save if title is filled
             savePromptBtn.disabled = !promptTitleInput.value.trim();
         } else if (originalPromptData) {
-            // Protected prompts cannot be saved
+            // Protected prompts cannot have content edited, but selection can change
             if (originalPromptData.protected) {
-                savePromptBtn.disabled = true;
+                // Allow save if only selection changed (not content)
+                savePromptBtn.disabled = !hasPromptSelectionChanged();
                 return;
             }
-            // For existing prompts, enable save if anything changed
-            const hasChanges =
-                promptTitleInput.value !== originalPromptData.title ||
-                promptDescInput.value !== (originalPromptData.description || '') ||
-                promptContentInput.value !== (originalPromptData.content || '');
+            // For existing prompts, enable save if content changed OR selection changed
+            const hasChanges = hasPromptContentChanges() || hasPromptSelectionChanged();
             savePromptBtn.disabled = !hasChanges || !promptTitleInput.value.trim();
         } else {
-            savePromptBtn.disabled = true;
+            // No original data - only enable if selection changed
+            savePromptBtn.disabled = !hasPromptSelectionChanged();
         }
     }
 
@@ -493,11 +517,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function savePrompt() {
+        // If selection changed, show confirmation modal (chat will be reset)
+        if (hasPromptSelectionChanged()) {
+            showResetChatModal();
+            return; // Wait for user confirmation
+        }
+
+        // Otherwise, proceed with content save only
+        await performPromptSave(false);
+    }
+
+    async function performPromptSave(resetChat = false) {
         const title = promptTitleInput.value.trim();
         const description = promptDescInput.value.trim();
         const content = promptContentInput.value.trim();
+        const contentChanged = hasPromptContentChanges();
+        const promptId = promptSelect.value;
 
-        if (!title) {
+        // For content edits, title is required
+        if (contentChanged && !title) {
             SettingsLogger.warn('Save failed: title is required');
             return;
         }
@@ -506,38 +544,54 @@ document.addEventListener('DOMContentLoaded', () => {
         savePromptBtn.textContent = 'Saving...';
 
         try {
-            let response;
-            let promptId;
+            // Only call backend API if content was edited (not just selection change)
+            if (contentChanged || isCreatingNew) {
+                let response;
+                let saveId;
 
-            if (isCreatingNew) {
-                promptId = generatePromptId(title);
-                SettingsLogger.info('Creating new prompt', { id: promptId });
-                response = await fetch('/api/prompts', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: promptId, title, description, content })
-                });
-            } else {
-                promptId = promptSelect.value;
-                SettingsLogger.info('Updating prompt', { id: promptId });
-                response = await fetch(`/api/prompts/${promptId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title, description, content })
-                });
+                if (isCreatingNew) {
+                    saveId = generatePromptId(title);
+                    SettingsLogger.info('Creating new prompt', { id: saveId });
+                    response = await fetch('/api/prompts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: saveId, title, description, content })
+                    });
+                } else {
+                    saveId = promptId;
+                    SettingsLogger.info('Updating prompt', { id: saveId });
+                    response = await fetch(`/api/prompts/${saveId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title, description, content })
+                    });
+                }
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to save prompt');
+                }
+
+                SettingsLogger.info('Prompt content saved successfully', { id: saveId });
+
+                // Reload prompts after content change
+                await loadPrompts();
+                promptSelect.value = saveId;
             }
 
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Failed to save prompt');
-            }
-
-            SettingsLogger.info('Prompt saved successfully', { id: promptId });
-
-            // Reload prompts and select the saved one
-            await loadPrompts();
-            promptSelect.value = promptId;
+            // Update localStorage with current selection
             localStorage.setItem(PROMPT_STORAGE_KEY, promptId);
+            SettingsLogger.info('Prompt selection saved', { id: promptId });
+
+            // Update the original selection tracker
+            originalSelectedPromptId = promptId;
+
+            // Reset chat if requested (prompt selection changed)
+            if (resetChat) {
+                clearConversationSession();
+                SettingsLogger.info('Conversation session cleared due to prompt change');
+            }
+
             loadPromptIntoForm();
 
         } catch (error) {
@@ -546,6 +600,39 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             savePromptBtn.textContent = 'Save Changes';
             updateSaveButtonState();
+        }
+    }
+
+    function clearConversationSession() {
+        sessionStorage.removeItem(SESSION_HISTORY_KEY);
+        sessionStorage.removeItem(SESSION_METRICS_KEY);
+        sessionStorage.removeItem(SESSION_METADATA_KEY);
+        SettingsLogger.info('Cleared conversation session storage');
+    }
+
+    function showResetChatModal() {
+        if (resetChatModal) {
+            resetChatModal.classList.add('visible');
+        } else {
+            // Fallback if modal doesn't exist - use confirm()
+            if (confirm('Changing the system prompt will reset your chat history. Continue?')) {
+                performPromptSave(true);
+            }
+        }
+    }
+
+    function hideResetChatModal() {
+        if (resetChatModal) {
+            resetChatModal.classList.remove('visible');
+        }
+    }
+
+    function revertPromptSelection() {
+        // Revert to the original selection when user cancels
+        if (originalSelectedPromptId && promptSelect.querySelector(`option[value="${originalSelectedPromptId}"]`)) {
+            promptSelect.value = originalSelectedPromptId;
+            loadPromptIntoForm();
+            SettingsLogger.info('Reverted prompt selection', { prompt: originalSelectedPromptId });
         }
     }
 
@@ -604,9 +691,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedPrompt = promptSelect.value;
         if (selectedPrompt) {
             isCreatingNew = false;
-            localStorage.setItem(PROMPT_STORAGE_KEY, selectedPrompt);
-            SettingsLogger.info('Prompt selection changed', { prompt: selectedPrompt });
+            // Don't save to localStorage immediately - wait for Save button
+            SettingsLogger.info('Prompt selection changed (pending save)', {
+                prompt: selectedPrompt,
+                originalPrompt: originalSelectedPromptId
+            });
             loadPromptIntoForm();
+            updateSaveButtonState(); // Enable save button if selection differs
         }
     });
 
@@ -619,6 +710,29 @@ document.addEventListener('DOMContentLoaded', () => {
     deletePromptBtn.addEventListener('click', showDeleteModal);
     deleteModalCancel.addEventListener('click', hideDeleteModal);
     deleteModalOk.addEventListener('click', deletePrompt);
+
+    // Reset chat confirmation modal
+    if (resetChatModalCancel) {
+        resetChatModalCancel.addEventListener('click', () => {
+            hideResetChatModal();
+            revertPromptSelection(); // Revert to original selection
+        });
+    }
+    if (resetChatModalOk) {
+        resetChatModalOk.addEventListener('click', () => {
+            hideResetChatModal();
+            performPromptSave(true); // Save and reset chat
+        });
+    }
+    // Close modal when clicking outside
+    if (resetChatModal) {
+        resetChatModal.addEventListener('click', (e) => {
+            if (e.target === resetChatModal) {
+                hideResetChatModal();
+                revertPromptSelection();
+            }
+        });
+    }
 
     // ===== RAG Settings Functions =====
 
