@@ -160,10 +160,85 @@ For local mode, the service validates:
 
 ## Sample Data
 
-A pre-built ChromaDB with 195 chunks from "The Morn Chronicles" (a Star Trek DS9 fan fiction, 28 chapters) ships at `data/chroma_db_sample/`. To use it:
+A pre-built ChromaDB with 195 chunks from "The Morn Chronicles" (a Star Trek DS9 fan fiction, 28 chapters) is included in the repository. On first startup, the app automatically copies the pristine sample from `data/chroma_db_sample/` to `data/chroma_db/` (which is gitignored) to prevent git deltas from ChromaDB's internal file mutations.
+
+To use it:
 
 1. Go to Settings > RAG Settings
 2. Select "Local" mode
-3. Enter path: `data/chroma_db_sample` (relative paths work)
+3. Enter path: `data/chroma_db` (relative paths work)
 4. Test connection and select the collection
 5. Save and enable RAG in chat
+
+---
+
+# Appendix: Deep Dive
+
+## ChromaDB Data Layout
+
+Understanding how ChromaDB stores data helps explain why multiple collections can coexist in a single database path.
+
+### PersistentClient Directory Structure
+
+When you use `chromadb.PersistentClient(path="data/chroma_db")`, ChromaDB creates this structure:
+
+```
+data/chroma_db/
+├── chroma.sqlite3                          # Shared metadata database
+├── 2a31d927-ff2a-4dbf-b30f-094e5e91b702/  # Collection 1 vector data
+│   ├── data_level0.bin
+│   ├── header.bin
+│   ├── length.bin
+│   └── link_lists.bin
+└── fbe357dd-b35e-4646-86c2-f71862b696f9/  # Collection 2 vector data
+    ├── data_level0.bin
+    ├── header.bin
+    ├── length.bin
+    └── link_lists.bin
+```
+
+### What Each Component Does
+
+| Component | Purpose |
+|-----------|---------|
+| `chroma.sqlite3` | SQLite database storing collection metadata, document IDs, and text content for ALL collections in this path |
+| UUID directories | HNSW index files for vector similarity search, one directory per collection |
+| `data_level0.bin` | The actual vector embeddings |
+| `header.bin`, `length.bin`, `link_lists.bin` | HNSW graph structure for fast approximate nearest neighbor search |
+
+### Key Insight: Shared Database
+
+The `chroma.sqlite3` file is **shared across all collections** in that path. This means:
+
+1. **Sample DB + Ingested Data Coexist**: When the app copies the sample database on startup, it brings its `chroma.sqlite3` and collection folder. When you run `utils/ingest.py`, it opens the same `chroma.sqlite3` and adds new collections alongside the existing ones.
+
+2. **Single Connection Point**: The app only needs one path (`data/chroma_db`) to access all collections - both the sample "Morn Chronicles" and any documents you ingest.
+
+3. **Why We Copy the Sample**: ChromaDB mutates `chroma.sqlite3` even during read operations (for internal bookkeeping). By copying `data/chroma_db_sample/` to `data/chroma_db/` on startup, we keep the committed sample pristine while allowing the working copy to be modified freely.
+
+### How Ingestion Works
+
+The `utils/ingest.py` script (line 39, 535-536):
+
+```python
+RAG_DB_FILE_PATH = Path(__file__).parent.parent / "data" / "chroma_db"
+# ...
+client = PersistentClient(path=str(RAG_DB_FILE_PATH))
+collection = client.get_or_create_collection(name=collection_name)
+```
+
+This creates or opens `data/chroma_db/chroma.sqlite3` and adds the new collection. The collection name follows the pattern `{corpus}-{chunk_size}chunk-{overlap}overlap` (e.g., `morn-chronicles-256chunk-50overlap`).
+
+### Listing All Collections
+
+To see all collections in a database:
+
+```python
+import chromadb
+
+client = chromadb.PersistentClient(path="data/chroma_db")
+for col in client.list_collections():
+    print(f"{col.name}: {col.count()} documents")
+```
+
+Or use the RAG Settings UI - after testing the connection, the collection dropdown shows all available collections.

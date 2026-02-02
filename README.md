@@ -74,7 +74,7 @@ RAG integration allows the chat to retrieve relevant documents from ChromaDB and
 3. Test connection and select a collection
 4. Enable RAG toggle in chat sidebar
 
-> **Sample Data Included**: A pre-built ChromaDB with 195 chunks from "The Morn Chronicles" (a Star Trek DS9 fan fiction) ships at `data/chroma_db_sample/`.
+> **Sample Data Included**: A pre-built ChromaDB with 195 chunks from "The Morn Chronicles" (a Star Trek DS9 fan fiction) is automatically copied to `data/chroma_db/` on first startup. Use path `data/chroma_db` in RAG Settings.
 
 ## Content Preparation
 
@@ -114,8 +114,8 @@ chat-rag-explorer/
 ├── data/
 │   ├── corpus/                  # Source markdown documents
 │   ├── chunks/                  # Chunk previews for inspection (gitignored)
-│   ├── chroma_db/               # Your ChromaDB vector store (gitignored)
-│   └── chroma_db_sample/        # Pre-built sample DB (Morn Chronicles)
+│   ├── chroma_db/               # Working ChromaDB databases (gitignored, auto-created)
+│   └── chroma_db_sample/        # Pristine sample DB (copied to chroma_db/ on startup)
 ├── prompts/                     # System prompt templates (markdown)
 ├── logs/                        # Application logs (gitignored)
 ├── tests/                       # Test suite

@@ -6,6 +6,7 @@ This module handles:
 - Automatic port discovery (tries ports 8000-8004 if one is busy)
 - Werkzeug reloader compatibility for hot-reloading during development
 - Environment validation (warns if .env or OPENROUTER_API_KEY missing, but allows startup)
+- Sample database setup (copies pristine sample to working directory on first run)
 
 The app will start without an API key configured. In this case:
 - Console shows warning messages with setup instructions
@@ -17,6 +18,7 @@ Usage:
 """
 import logging
 import os
+import shutil
 import socket
 from pathlib import Path
 
@@ -60,8 +62,77 @@ def validate_environment() -> None:
         logger.warning("=" * 60)
 
 
+def setup_sample_database() -> None:
+    """
+    Copy the sample ChromaDB database to the working directory on first run.
+
+    The repository includes a pristine sample database at data/chroma_db_sample/
+    which gets copied to data/chroma_db/ (gitignored) to prevent git deltas
+    from ChromaDB's internal file mutations during read operations.
+
+    This function:
+    - Creates data/chroma_db/ if it doesn't exist
+    - Copies the sample database only if the destination doesn't already exist
+    - Provides helpful terminal output about the setup process
+    """
+    project_root = Path(__file__).parent
+    sample_dir = project_root / "data" / "chroma_db_sample"
+    working_dir = project_root / "data" / "chroma_db"
+
+    # Check if sample exists
+    if not sample_dir.exists():
+        logger.debug("No sample database found at data/chroma_db_sample/")
+        return
+
+    # Get the sample database name (subdirectory containing the actual DB)
+    sample_dbs = [d for d in sample_dir.iterdir() if d.is_dir()]
+    sample_sqlite = sample_dir / "chroma.sqlite3"
+
+    if not sample_sqlite.exists():
+        logger.debug("Sample directory exists but contains no ChromaDB database")
+        return
+
+    # Create working directory if needed
+    if not working_dir.exists():
+        working_dir.mkdir(parents=True)
+        logger.info("📁 Created data/chroma_db/ directory for working databases")
+
+    # Check if sample has already been copied (look for the sqlite file)
+    dest_sqlite = working_dir / "chroma.sqlite3"
+    if dest_sqlite.exists():
+        logger.info("✓ Sample database already present in data/chroma_db/")
+        return
+
+    # Copy the sample database
+    logger.info("=" * 60)
+    logger.info("📦 Setting up sample ChromaDB database...")
+    logger.info(f"   Source: data/chroma_db_sample/")
+    logger.info(f"   Destination: data/chroma_db/")
+
+    try:
+        # Copy the sqlite file
+        shutil.copy2(sample_sqlite, dest_sqlite)
+        logger.info("   ✓ Copied chroma.sqlite3")
+
+        # Copy any subdirectories (collection data)
+        for subdir in sample_dbs:
+            dest_subdir = working_dir / subdir.name
+            if not dest_subdir.exists():
+                shutil.copytree(subdir, dest_subdir)
+                logger.info(f"   ✓ Copied collection data: {subdir.name}")
+
+        logger.info("✅ Sample database ready!")
+        logger.info("   Use 'data/chroma_db' in RAG Settings to access it.")
+        logger.info("=" * 60)
+
+    except Exception as e:
+        logger.error(f"❌ Failed to copy sample database: {e}")
+        logger.error("   You can manually copy data/chroma_db_sample/ to data/chroma_db/")
+
+
 validate_environment()
 app = create_app()
+setup_sample_database()
 
 
 def is_port_available(host: str, port: int) -> bool:

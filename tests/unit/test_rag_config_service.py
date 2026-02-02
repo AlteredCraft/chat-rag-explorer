@@ -513,6 +513,40 @@ class TestDiscoverDatabases:
         assert len(result["databases"]) == 1
         assert result["databases"][0]["name"] == "valid_db"
 
+    def test_excludes_chroma_db_sample(self, tmp_path, monkeypatch):
+        """Excludes chroma_db_sample directory (pristine source, not for user access)."""
+        service = RagConfigService()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+
+        # Create the sample directory (should be excluded)
+        sample_dir = data_dir / "chroma_db_sample"
+        sample_dir.mkdir()
+        (sample_dir / "chroma.sqlite3").write_text("pristine sample")
+
+        # Create the working copy (should be included)
+        working_dir = data_dir / "chroma_db"
+        working_dir.mkdir()
+        (working_dir / "chroma.sqlite3").write_text("working copy")
+
+        # Mock path resolution
+        def mock_path(path_str):
+            p = Path(path_str)
+            if p.name == "rag_config_service.py":
+                return tmp_path / "chat_rag_explorer" / "rag_config_service.py"
+            return p
+
+        monkeypatch.setattr("chat_rag_explorer.rag_config_service.Path", mock_path)
+
+        result = service.discover_databases()
+
+        assert result["success"] is True
+        assert len(result["databases"]) == 1
+        assert result["databases"][0]["name"] == "chroma_db"
+        # Verify sample is not in results
+        names = [db["name"] for db in result["databases"]]
+        assert "chroma_db_sample" not in names
+
     @patch("chat_rag_explorer.rag_config_service.chromadb.PersistentClient")
     def test_includes_collection_count(self, mock_client_class, tmp_path, monkeypatch):
         """Includes collection count when accessible."""

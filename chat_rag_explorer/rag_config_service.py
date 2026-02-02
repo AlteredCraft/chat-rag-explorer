@@ -213,8 +213,11 @@ class RagConfigService:
                 }
 
             # Search for chroma.sqlite3 files in subdirectories
+            # Skip chroma_db_sample - it's the pristine source copied to chroma_db on startup
             for subdir in data_dir.iterdir():
                 if not subdir.is_dir():
+                    continue
+                if subdir.name == 'chroma_db_sample':
                     continue
 
                 chroma_db_file = subdir / 'chroma.sqlite3'
