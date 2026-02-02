@@ -7,11 +7,14 @@
         <link rel="stylesheet" href="/static/style.css" />
     </head>
     <body>
+        <!-- Skip link for keyboard navigation -->
+        <a href="#settings-content" class="skip-link">Skip to settings</a>
+
         <div class="settings-layout">
-            <div class="settings-container">
+            <main class="settings-container" role="main">
                 <header>
                     <div class="header-content">
-                        <a href="/" class="back-link">&larr; Back to Chat</a>
+                        <a href="/" class="back-link" aria-label="Return to chat">&larr; Back to Chat</a>
                         <h1>Settings</h1>
                     </div>
                 </header>
@@ -33,15 +36,15 @@
                     </div>
                 </div>
 
-                <div class="settings-content">
-                    <nav class="settings-tabs">
-                        <button class="tab-btn active" data-tab="model">Model Selection</button>
-                        <button class="tab-btn" data-tab="prompt">System Prompt</button>
-                        <button class="tab-btn" data-tab="rag">RAG Settings</button>
+                <div id="settings-content" class="settings-content">
+                    <nav class="settings-tabs" role="tablist" aria-label="Settings sections">
+                        <button class="tab-btn active" data-tab="model" role="tab" aria-selected="true" aria-controls="panel-model" id="tab-model">Model Selection</button>
+                        <button class="tab-btn" data-tab="prompt" role="tab" aria-selected="false" aria-controls="panel-prompt" id="tab-prompt">System Prompt</button>
+                        <button class="tab-btn" data-tab="rag" role="tab" aria-selected="false" aria-controls="panel-rag" id="tab-rag">RAG Settings</button>
                     </nav>
 
                     <div class="tab-panels">
-                        <section class="tab-panel active" data-panel="model">
+                        <section class="tab-panel active" data-panel="model" role="tabpanel" id="panel-model" aria-labelledby="tab-model">
                             <p class="section-description">Choose the AI model to use for chat conversations.</p>
 
                             <div id="models-list-info" class="info-box" style="display: none;">
@@ -74,7 +77,7 @@
                             </div>
                         </section>
 
-                        <section class="tab-panel" data-panel="prompt">
+                        <section class="tab-panel" data-panel="prompt" role="tabpanel" id="panel-prompt" aria-labelledby="tab-prompt">
                             <p class="section-description">Manage system prompts that define the AI's behavior and personality.</p>
 
                             <div class="setting-item">
@@ -110,7 +113,7 @@
                             </div>
                         </section>
 
-                        <section class="tab-panel" data-panel="rag">
+                        <section class="tab-panel" data-panel="rag" role="tabpanel" id="panel-rag" aria-labelledby="tab-rag">
                             <p class="section-description">Configure ChromaDB for Retrieval-Augmented Generation (RAG).</p>
 
                             <!-- Wizard Steps Container -->
@@ -282,29 +285,29 @@
                                                     <div class="param-header">
                                                         <label for="rag-n-results-slider">
                                                             <span class="tooltip-wrapper">
-                                                                <span class="help-icon">?</span>
-                                                                <span class="tooltip-content">Number of documents to retrieve from the knowledge base for each query.</span>
+                                                                <button type="button" class="help-icon" aria-label="What is results count?" tabindex="0">?</button>
+                                                                <span class="tooltip-content" role="tooltip">Number of documents to retrieve from the knowledge base for each query.</span>
                                                             </span>
                                                             Results Count
                                                         </label>
-                                                        <span id="rag-n-results-value" class="param-value">5</span>
+                                                        <span id="rag-n-results-value" class="param-value" aria-live="polite">5</span>
                                                     </div>
-                                                    <input type="range" id="rag-n-results-slider" min="1" max="10" step="1" value="5">
+                                                    <input type="range" id="rag-n-results-slider" min="1" max="10" step="1" value="5" aria-describedby="rag-n-results-value">
                                                 </div>
 
                                                 <div class="param-control">
                                                     <div class="param-header">
                                                         <label for="rag-distance-slider">
                                                             <span class="tooltip-wrapper">
-                                                                <span class="help-icon">?</span>
-                                                                <span class="tooltip-content">Maximum distance threshold. Lower values = more relevant results. Set to 0 to disable filtering.</span>
+                                                                <button type="button" class="help-icon" aria-label="What is distance threshold?" tabindex="0">?</button>
+                                                                <span class="tooltip-content" role="tooltip">Maximum distance threshold. Lower values = more relevant results. Set to 0 to disable filtering.</span>
                                                             </span>
                                                             Distance Threshold
                                                         </label>
-                                                        <span id="rag-distance-value" class="param-value">Off</span>
+                                                        <span id="rag-distance-value" class="param-value" aria-live="polite">Off</span>
                                                     </div>
-                                                    <input type="range" id="rag-distance-slider" min="0" max="3" step="0.1" value="0">
-                                                    <span class="param-hint">0 = no filtering (include all results)</span>
+                                                    <input type="range" id="rag-distance-slider" min="0" max="3" step="0.1" value="0" aria-describedby="rag-distance-hint">
+                                                    <span class="param-hint" id="rag-distance-hint">0 = no filtering (include all results)</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -344,12 +347,12 @@
                         </section>
                     </div>
                 </div>
-            </div>
+            </main>
         </div>
 
-        <div id="delete-modal" class="modal-overlay">
+        <div id="delete-modal" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="delete-modal-message" aria-hidden="true">
             <div class="modal">
-                <p class="modal-message">Delete this prompt? This cannot be undone.</p>
+                <p id="delete-modal-message" class="modal-message">Delete this prompt? This cannot be undone.</p>
                 <div class="modal-buttons">
                     <button id="delete-modal-cancel" class="modal-btn modal-btn-cancel">Cancel</button>
                     <button id="delete-modal-ok" class="modal-btn modal-btn-ok">Delete</button>
@@ -357,9 +360,9 @@
             </div>
         </div>
 
-        <div id="reset-chat-modal" class="modal-overlay">
+        <div id="reset-chat-modal" class="modal-overlay" role="alertdialog" aria-modal="true" aria-labelledby="reset-chat-modal-message" aria-hidden="true">
             <div class="modal">
-                <p class="modal-message">Changing the system prompt will reset your chat history. Continue?</p>
+                <p id="reset-chat-modal-message" class="modal-message">Changing the system prompt will reset your chat history. Continue?</p>
                 <div class="modal-buttons">
                     <button id="reset-chat-modal-cancel" class="modal-btn modal-btn-cancel">Cancel</button>
                     <button id="reset-chat-modal-ok" class="modal-btn modal-btn-ok">Reset &amp; Apply</button>

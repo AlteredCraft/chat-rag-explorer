@@ -49,6 +49,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitButton = chatForm.querySelector('button');
     // Settings link navigates directly (chat is preserved in sessionStorage)
 
+    // Mobile sidebar toggle
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', () => {
+            const isOpen = sidebar.classList.toggle('open');
+            sidebarToggle.setAttribute('aria-expanded', isOpen);
+            if (sidebarOverlay) {
+                sidebarOverlay.classList.toggle('visible', isOpen);
+            }
+            AppLogger.debug('Sidebar toggled', { isOpen });
+        });
+
+        // Close sidebar when clicking overlay
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', () => {
+                sidebar.classList.remove('open');
+                sidebarToggle.setAttribute('aria-expanded', 'false');
+                sidebarOverlay.classList.remove('visible');
+            });
+        }
+
+        // Close sidebar on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+                sidebar.classList.remove('open');
+                sidebarToggle.setAttribute('aria-expanded', 'false');
+                if (sidebarOverlay) {
+                    sidebarOverlay.classList.remove('visible');
+                }
+            }
+        });
+    }
+
     // API key status tracking
     let apiKeyConfigured = true; // Assume configured until we check
     const apiKeyBanner = document.getElementById('api-key-banner');
