@@ -1,5 +1,5 @@
 """
-Application entry point for Chat RAG Explorer.
+Application entry point for RAG Lab.
 
 This module handles:
 - Flask application startup with debug mode

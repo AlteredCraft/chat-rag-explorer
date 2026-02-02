@@ -20,6 +20,8 @@ All notable changes to this project will be documented in this file.
 - Message slide-in animations and modal transitions
 
 ### Changed
+- **Renamed project from "Chat RAG Explorer" to "RAG Lab"**
+- Bolder header title with orange accent on "RAG"
 - Model Selection UI now educates users about model list curation
 - Primary accent color changed from blue to warm orange (#ea580c)
 - Help icons converted to buttons with 44px touch targets (WCAG compliance)

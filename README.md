@@ -1,4 +1,4 @@
-# Chat RAG Explorer
+# RAG Lab
 
 An educational application designed to demonstrate the implementation of a Chat interface with Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG). This project is used as a teaching aid for hands-on RAG workshops, such as [Building RAG Applications](https://alteredcraft.github.io/workshop-rag-basics/). Interested in having a similar course delivered to your team? Contact [info@alteredcraft.com](mailto:info@alteredcraft.com).
 
@@ -156,7 +156,7 @@ Set these environment variables in your `.env` file:
 **Startup Banner**: On application start, logs configuration summary with masked API key:
 ```
 ============================================================
-Chat RAG Explorer - Starting up
+RAG Lab - Starting up
 ============================================================
 Configuration:
   - OpenRouter Base URL: https://openrouter.ai/api/v1

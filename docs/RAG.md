@@ -1,6 +1,6 @@
 # RAG Integration
 
-This document describes the ChromaDB/RAG integration in Chat RAG Explorer.
+This document describes the ChromaDB/RAG integration in RAG Lab.
 
 ## Current Status: Complete
 

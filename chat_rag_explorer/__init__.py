@@ -1,5 +1,5 @@
 """
-Chat RAG Explorer - Flask application factory and initialization.
+RAG Lab - Flask application factory and initialization.
 
 This module provides:
 - create_app(): Factory function that creates and configures the Flask app
@@ -47,7 +47,7 @@ def create_app(config_class=Config):
 def _log_startup_config(app):
     """Log important configuration values at startup."""
     logger.info("=" * 60)
-    logger.info("Chat RAG Explorer - Starting up")
+    logger.info("RAG Lab - Starting up")
     logger.info("=" * 60)
 
     # Log environment/config (mask sensitive values)

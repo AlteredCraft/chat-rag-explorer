@@ -239,9 +239,14 @@ header {
 }
 
 header h1 {
-    font-size: var(--text-lg);
-    font-weight: 600;
+    font-size: 1.75rem;
+    font-weight: 700;
     color: var(--text-primary);
+    letter-spacing: -0.025em;
+}
+
+header h1 .brand-accent {
+    color: var(--primary-color);
 }
 
 /* API Key Warning Banner */
