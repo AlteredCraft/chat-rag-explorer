@@ -10,9 +10,22 @@ All notable changes to this project will be documented in this file.
 - Link to openrouter.ai/models for browsing available models
 - Conditional "Show free models only" filter - only displays when free models exist
 - Unit tests for `get_models_list_status()` function
+- IBM Plex Sans and Plex Mono fonts for improved typography
+- CSS design tokens for consistent spacing, shadows, and transitions
+- Skip link for keyboard navigation (accessibility)
+- ARIA landmarks, roles, and live regions throughout HTML
+- Focus-visible states on all interactive elements
+- Mobile responsive layout with bottom drawer sidebar
+- Hamburger menu toggle for mobile navigation
+- Message slide-in animations and modal transitions
 
 ### Changed
 - Model Selection UI now educates users about model list curation
+- Primary accent color changed from blue to warm orange (#ea580c)
+- Help icons converted to buttons with 44px touch targets (WCAG compliance)
+- Sidebar now scrollable to access all sections including RAG
+- Settings tabs horizontally scrollable on mobile
+- Info box styling aligned with orange accent theme
 
 
 ## 2026-02-02
