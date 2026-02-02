@@ -27,6 +27,7 @@ def create_app(config_class=Config):
 
     from chat_rag_explorer.logging import setup_logging
 
+    # setup_logging() is idempotent - safe to call even if already configured in main.py
     setup_logging(app)
 
     # Log startup configuration only in main process (not reloader child)

@@ -23,7 +23,11 @@ import socket
 from pathlib import Path
 
 from chat_rag_explorer import create_app, is_reloader_process
+from chat_rag_explorer.logging import setup_logging
 from config import Config
+
+# Configure logging early so all startup functions can log properly
+setup_logging()
 
 logger = logging.getLogger("chat_rag_explorer")
 
