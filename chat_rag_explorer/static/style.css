@@ -2462,3 +2462,88 @@ button:disabled {
 .help-message li {
     margin: 0.25rem 0;
 }
+
+/* Info Box (Model List Status) */
+.info-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.info-box-icon {
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.info-icon-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-style: italic;
+    font-family: Georgia, serif;
+}
+
+.info-box-content {
+    flex: 1;
+}
+
+.info-box-content strong {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.info-box-content p {
+    margin: 0;
+    color: inherit;
+    opacity: 0.85;
+}
+
+.info-box-content code {
+    background: rgba(0, 0, 0, 0.08);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    font-size: 0.85em;
+}
+
+/* Active state - when .models_list exists and is filtering */
+.info-box-active {
+    background: #e8f4fd;
+    border: 1px solid #b8daff;
+    color: #004085;
+}
+
+.info-box-active .info-icon-circle {
+    background: #004085;
+    color: #fff;
+}
+
+.info-box-active .info-box-content code {
+    background: rgba(0, 64, 133, 0.12);
+}
+
+/* Neutral state - when .models_list does not exist */
+.info-box-neutral {
+    background: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    color: #586069;
+}
+
+.info-box-neutral .info-icon-circle {
+    background: #586069;
+    color: #fff;
+}
+
+.info-box-neutral .info-box-content code {
+    background: rgba(0, 0, 0, 0.06);
+}

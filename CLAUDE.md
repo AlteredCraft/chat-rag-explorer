@@ -94,3 +94,7 @@ logger.info(f"[{request_id}] POST /api/chat - Model: {model}")
 - `cloud`: CloudClient with tenant/database/API key
 
 **Sample Database Setup**: On startup, `main.py` copies `data/chroma_db_sample/` to `data/chroma_db/` (gitignored) if the destination doesn't exist. This prevents git deltas from ChromaDB's internal file mutations during read operations. The pristine sample remains in `chroma_db_sample/` as the source of truth.
+
+## Changelog
+
+**IMPORTANT**: When committing changes, update `CHANGELOG.txt` with a summary of what was added, changed, or fixed. Group related changes under `[Unreleased]` until a version is released.

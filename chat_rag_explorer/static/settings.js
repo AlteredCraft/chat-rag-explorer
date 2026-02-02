@@ -107,6 +107,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadingIndicator = document.getElementById('loading-indicator');
     const modelDetails = document.getElementById('model-details');
     const freeOnlyFilter = document.getElementById('free-only-filter');
+    const freeFilterRow = document.getElementById('free-filter-row');
+    const modelsListInfo = document.getElementById('models-list-info');
+    const modelsListTitle = document.getElementById('models-list-title');
+    const modelsListDescription = document.getElementById('models-list-description');
 
     const STORAGE_KEY = 'chat-rag-selected-model';
     const FILTER_STORAGE_KEY = 'chat-rag-free-filter';
@@ -144,6 +148,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const promptPrice = parseFloat(pricing.prompt) || 0;
         const completionPrice = parseFloat(pricing.completion) || 0;
         return promptPrice === 0 && completionPrice === 0;
+    }
+
+    function updateFreeFilterVisibility(models) {
+        if (!freeFilterRow) return;
+
+        const hasFreeModels = models.some(isFreeModel);
+        freeFilterRow.style.display = hasFreeModels ? 'flex' : 'none';
+
+        // If no free models and filter was checked, uncheck it
+        if (!hasFreeModels && freeOnlyFilter.checked) {
+            freeOnlyFilter.checked = false;
+            localStorage.setItem(FILTER_STORAGE_KEY, 'false');
+        }
+
+        SettingsLogger.debug('Free filter visibility updated', {
+            hasFreeModels,
+            visible: hasFreeModels
+        });
     }
 
     let modelsData = [];
@@ -189,6 +211,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadTime_ms: elapsed.toFixed(2)
             });
 
+            // Display models_list status info
+            updateModelsListInfo(data.models_list);
+
+            // Show/hide free filter based on whether there are free models
+            updateFreeFilterVisibility(modelsData);
+
             populateModelSelect(modelsData);
             restoreSelectedModel();
 
@@ -203,6 +231,35 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingIndicator.classList.remove('active');
             modelSelect.disabled = false;
         }
+    }
+
+    function updateModelsListInfo(modelsListStatus) {
+        if (!modelsListInfo || !modelsListStatus) return;
+
+        if (modelsListStatus.exists) {
+            modelsListInfo.style.display = 'flex';
+            modelsListInfo.classList.remove('info-box-neutral');
+            modelsListInfo.classList.add('info-box-active');
+            modelsListTitle.textContent = 'Curated Model List Active';
+            modelsListDescription.innerHTML = `
+                The available models are filtered by <code>${modelsListStatus.path}</code>
+                (${modelsListStatus.count} model${modelsListStatus.count !== 1 ? 's' : ''} configured).
+                You can curate the model list by editing this file. See
+                <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a>
+                to browse available models.
+            `;
+        } else {
+            modelsListInfo.style.display = 'flex';
+            modelsListInfo.classList.remove('info-box-active');
+            modelsListInfo.classList.add('info-box-neutral');
+            modelsListTitle.textContent = 'All Models Available';
+            modelsListDescription.innerHTML = `
+                Showing all models from OpenRouter. To curate the list, create a
+                <code>${modelsListStatus.path}</code> file with one model ID per line.
+            `;
+        }
+
+        SettingsLogger.debug('Models list info updated', modelsListStatus);
     }
 
     function populateModelSelect(models) {

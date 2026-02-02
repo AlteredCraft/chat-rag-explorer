@@ -5,12 +5,14 @@ Tests the extracted pure functions that don't require mocking.
 """
 import json
 import pytest
+from unittest.mock import patch
 from chat_rag_explorer.services import (
     mask_api_key,
     build_chat_params,
     extract_usage_data,
     format_metadata_marker,
     sort_models_by_name,
+    get_models_list_status,
 )
 
 
@@ -261,3 +263,70 @@ class TestChatServiceIsConfigured:
         service = ChatService()
 
         assert service.is_configured() is False
+
+
+class TestGetModelsListStatus:
+    """Tests for get_models_list_status function."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self, app_context, tmp_path):
+        """Set up test environment with mocked app root path."""
+        # Create subdirectory to simulate app root structure
+        self.app_root = tmp_path / "chat_rag_explorer"
+        self.app_root.mkdir()
+        self.project_root = tmp_path
+        self.models_list_path = tmp_path / ".models_list"
+
+        # Patch current_app.root_path for all tests
+        patcher = patch("chat_rag_explorer.services.current_app")
+        self.mock_app = patcher.start()
+        self.mock_app.root_path = str(self.app_root)
+        yield
+        patcher.stop()
+
+    def test_file_not_exists(self):
+        """Returns exists=False when .models_list doesn't exist."""
+        result = get_models_list_status()
+
+        assert result == {"exists": False, "count": 0, "path": ".models_list"}
+
+    def test_file_exists_with_models(self):
+        """Returns exists=True and correct count when file has models."""
+        self.models_list_path.write_text("openai/gpt-4\nanthropic/claude-3\ndeepseek/v3\n")
+
+        result = get_models_list_status()
+
+        assert result == {"exists": True, "count": 3, "path": ".models_list"}
+
+    def test_file_with_comments_and_empty_lines(self):
+        """Comments and empty lines are not counted."""
+        self.models_list_path.write_text("# Comment\nopenai/gpt-4\n\nanthropic/claude-3\n")
+
+        result = get_models_list_status()
+
+        assert result["count"] == 2
+
+    def test_empty_file(self):
+        """Empty file returns exists=True but count=0."""
+        self.models_list_path.write_text("")
+
+        result = get_models_list_status()
+
+        assert result == {"exists": True, "count": 0, "path": ".models_list"}
+
+    def test_file_with_only_comments(self):
+        """File with only comments returns count=0."""
+        self.models_list_path.write_text("# Comment\n# Another\n")
+
+        result = get_models_list_status()
+
+        assert result["exists"] is True
+        assert result["count"] == 0
+
+    def test_whitespace_only_lines_not_counted(self):
+        """Lines with only whitespace are not counted."""
+        self.models_list_path.write_text("openai/gpt-4\n   \n\t\nanthropic/claude-3\n")
+
+        result = get_models_list_status()
+
+        assert result["count"] == 2

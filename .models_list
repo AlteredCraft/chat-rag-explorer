@@ -1,4 +1,7 @@
 # One model ID per line, comments start with #
+# see https://openrouter.ai/models to select models
+# If you remove this file, all models will be available. But
+#   note that many of those models are not approriate for chat.
 
 # OpenAI
 openai/gpt-5.2-chat

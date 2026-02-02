@@ -44,9 +44,19 @@
                         <section class="tab-panel active" data-panel="model">
                             <p class="section-description">Choose the AI model to use for chat conversations.</p>
 
+                            <div id="models-list-info" class="info-box" style="display: none;">
+                                <div class="info-box-icon">
+                                    <span class="info-icon-circle">i</span>
+                                </div>
+                                <div class="info-box-content">
+                                    <strong id="models-list-title">Model List Filtered</strong>
+                                    <p id="models-list-description"></p>
+                                </div>
+                            </div>
+
                             <div class="setting-item">
                                 <label for="model-select">Active Model</label>
-                                <div class="filter-row">
+                                <div id="free-filter-row" class="filter-row">
                                     <label class="filter-checkbox">
                                         <input type="checkbox" id="free-only-filter">
                                         <span>Show free models only</span>

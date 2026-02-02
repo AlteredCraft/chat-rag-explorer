@@ -1,0 +1,28 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+### Added
+- Educational info box on Settings page showing `.models_list` file status
+- Info box displays whether file exists and count of configured models
+- Link to openrouter.ai/models for browsing available models
+- Conditional "Show free models only" filter - only displays when free models exist
+- Unit tests for `get_models_list_status()` function
+
+### Changed
+- Model Selection UI now educates users about model list curation
+
+
+## 2026-02-02
+
+### Changed
+- 08376aa - Decouple logging setup from Flask for early initialization
+
+
+## 2026-02-01
+
+### Changed
+- 1fddf02 - Copy sample ChromaDB to working directory on startup
+- 1eb76d1 - Re-chunked morn at 256

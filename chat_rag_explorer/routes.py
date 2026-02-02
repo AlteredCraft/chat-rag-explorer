@@ -20,7 +20,7 @@ import logging
 import time
 import uuid
 from flask import Blueprint, current_app, render_template, request, Response, stream_with_context, jsonify
-from chat_rag_explorer.services import chat_service
+from chat_rag_explorer.services import chat_service, get_models_list_status
 from chat_rag_explorer.prompt_service import prompt_service
 from chat_rag_explorer.rag_config_service import rag_config_service
 from chat_rag_explorer.chat_history_service import chat_history_service
@@ -128,9 +128,13 @@ def get_models():
 
     try:
         models = chat_service.get_models(request_id)
+        models_list_status = get_models_list_status()
         elapsed = time.time() - start_time
         logger.info(f"[{request_id}] GET /api/models - Returned {len(models)} models ({elapsed:.3f}s)")
-        return jsonify({"data": models})
+        return jsonify({
+            "data": models,
+            "models_list": models_list_status
+        })
     except Exception as e:
         elapsed = time.time() - start_time
         logger.error(f"[{request_id}] GET /api/models - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)

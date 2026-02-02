@@ -128,6 +128,33 @@ def load_models_list():
     return models if models else None
 
 
+def get_models_list_status():
+    """Get status information about the .models_list file.
+
+    Returns:
+        Dict with:
+            - exists: bool - Whether the file exists
+            - count: int - Number of model IDs in the file (0 if doesn't exist)
+            - path: str - Relative path to the file
+    """
+    models_list_path = Path(current_app.root_path).parent / ".models_list"
+    exists = models_list_path.exists()
+    count = 0
+
+    if exists:
+        with open(models_list_path) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    count += 1
+
+    return {
+        "exists": exists,
+        "count": count,
+        "path": ".models_list"
+    }
+
+
 class ChatService:
     def __init__(self):
         self.client = None
