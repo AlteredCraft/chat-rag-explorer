@@ -2,9 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [Unreleased]
 
-### Added
+### Features
+
 - About page (`/about`) with project overview, tech stack, features, and architecture
 - About link in sidebar header next to Settings
 - Highlighted "Inspect Request Details" feature in README and About page with screenshots
@@ -24,6 +28,7 @@ All notable changes to this project will be documented in this file.
 - Message slide-in animations and modal transitions
 
 ### Changed
+
 - **Renamed project from "Chat RAG Explorer" to "RAG Lab"**
 - Bolder header title with orange accent on "RAG"
 - Model Selection UI now educates users about model list curation
@@ -33,15 +38,15 @@ All notable changes to this project will be documented in this file.
 - Settings tabs horizontally scrollable on mobile
 - Info box styling aligned with orange accent theme
 
-
-## 2026-02-02
-
-### Changed
-- 08376aa - Decouple logging setup from Flask for early initialization
-
-
-## 2026-02-01
+## [0.1.0] - 2026-02-02
 
 ### Changed
-- 1fddf02 - Copy sample ChromaDB to working directory on startup
-- 1eb76d1 - Re-chunked morn at 256
+
+- Decouple logging setup from Flask for early initialization (08376aa)
+
+## [0.0.1] - 2026-02-01
+
+### Changed
+
+- Copy sample ChromaDB to working directory on startup (1fddf02)
+- Re-chunked morn at 256 (1eb76d1)

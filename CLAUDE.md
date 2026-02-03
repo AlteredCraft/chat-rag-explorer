@@ -2,6 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## ⚠️ CONVENTIONAL COMMITS REQUIRED
+
+**ALL commits MUST use [Conventional Commits](https://www.conventionalcommits.org/) format.**
+
+```
+feat: add new feature        → minor version bump
+fix: correct a bug           → patch version bump
+feat!: breaking change       → major version bump
+docs: update documentation   → patch version bump
+chore: maintenance task      → no release
+```
+
+Release Please automates versioning based on commit prefixes. Non-conforming commits break the release process.
+
+---
+
 This app is for educational purposes, demonstrating how to build a streamingchat interface with LLMs using Flask and vanilla JavaScript.
 
 All python files should be well documented with file headers and function docstrings.
@@ -97,4 +115,4 @@ logger.info(f"[{request_id}] POST /api/chat - Model: {model}")
 
 ## Changelog
 
-**IMPORTANT**: When committing changes, update `CHANGELOG.txt` with a summary of what was added, changed, or fixed. Group related changes under `[Unreleased]` until a version is released.
+Release Please automatically generates `CHANGELOG.md` from conventional commits. No manual changelog updates needed.

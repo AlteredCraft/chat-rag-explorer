@@ -1,5 +1,10 @@
 # RAG Lab
 
+[![Tests](https://github.com/AlteredCraft/chat-rag-explorer/actions/workflows/test.yml/badge.svg)](https://github.com/AlteredCraft/chat-rag-explorer/actions/workflows/test.yml)
+[![GitHub Release](https://img.shields.io/github/v/release/AlteredCraft/chat-rag-explorer)](https://github.com/AlteredCraft/chat-rag-explorer/releases)
+
+Tested on Ubuntu, macOS, and Windows with Python 3.11, 3.12, and 3.13.
+
 An educational application designed to demonstrate the implementation of a Chat interface with Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG). Interested in a RAG workshop for your team? Contact [info@alteredcraft.com](mailto:info@alteredcraft.com). See [past workshop deliveries](https://lu.ma/altered-craft-workshops?k=c&period=past) for examples.
 
 This project uses **Flask** for the backend, **OpenRouter** for LLM access (supporting models like GPT-4, Claude 3, Llama 3, etc.), and **vanilla JavaScript** for a clean, streaming chat interface. The app can start without an API key configured, displaying helpful setup instructions in the UI.
@@ -221,6 +226,32 @@ nox -- -x                         # Pass args to pytest
 *   External dependencies (ChromaDB, OpenRouter) are mocked
 *   Use `tmp_path` fixture for any file operations
 *   Tests run in random order to catch hidden state dependencies
+
+## Release Process
+
+This project uses [Release Please](https://github.com/googleapis/release-please) for automated versioning and changelog generation.
+
+**How it works:**
+1. All commits to `main` must use [Conventional Commits](https://www.conventionalcommits.org/) format
+2. Release Please automatically creates/updates a Release PR with version bumps and changelog
+3. Merge the Release PR when ready to cut a release
+4. A GitHub Release and git tag are created automatically
+
+**Commit format:**
+| Prefix | Description | Version Bump |
+|--------|-------------|--------------|
+| `feat:` | New feature | Minor (0.1.0 → 0.2.0) |
+| `fix:` | Bug fix | Patch (0.1.0 → 0.1.1) |
+| `feat!:` or `fix!:` | Breaking change | Major (0.1.0 → 1.0.0) |
+| `docs:` | Documentation | Patch |
+| `chore:` | Maintenance | No release |
+
+**Examples:**
+```bash
+git commit -m "feat: add dark mode toggle"
+git commit -m "fix: correct token count in sidebar"
+git commit -m "feat!: redesign REST API endpoints"
+```
 
 ## License
 
