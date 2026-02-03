@@ -188,6 +188,32 @@ body {
     border-bottom: none;
 }
 
+.sidebar-header-section {
+    padding-top: 0;
+    padding-bottom: var(--space-4);
+}
+
+.settings-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: var(--text-base);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.settings-link:hover {
+    background: var(--hover-bg);
+    color: var(--primary-color);
+}
+
+.settings-icon {
+    font-size: 1.25rem;
+}
+
 .metric {
     display: flex;
     justify-content: space-between;
@@ -240,12 +266,20 @@ header {
 
 header h1 {
     font-size: 1.75rem;
-    font-weight: 700;
+    font-weight: 800;
     color: var(--text-primary);
     letter-spacing: -0.025em;
 }
 
 header h1 .brand-accent {
+    color: var(--primary-color);
+}
+
+.logo-icon {
+    width: 1.75em;
+    height: 1.75em;
+    vertical-align: -0.3em;
+    margin-right: 0.35rem;
     color: var(--primary-color);
 }
 
@@ -445,6 +479,10 @@ header h1 .brand-accent {
     gap: 0.5rem;
 }
 
+#chat-form .icon-btn {
+    flex-shrink: 0;
+}
+
 #message-input {
     flex: 1;
     padding: 0.875rem 1rem;
@@ -501,7 +539,7 @@ button:focus-visible {
 
 .header-content h1 {
     flex: 1;
-    text-align: center;
+    text-align: left;
 }
 
 .back-link {
