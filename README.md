@@ -1,7 +1,7 @@
 # RAG Lab
 
 [![Tests](https://github.com/AlteredCraft/chat-rag-explorer/actions/workflows/test.yml/badge.svg)](https://github.com/AlteredCraft/chat-rag-explorer/actions/workflows/test.yml)
-[![GitHub Release](https://img.shields.io/github/v/release/AlteredCraft/chat-rag-explorer)](https://github.com/AlteredCraft/chat-rag-explorer/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/AlteredCraft/chat-rag-explorer?filter=chat-rag-explorer-*)](https://github.com/AlteredCraft/chat-rag-explorer/releases)
 
 Tested on Ubuntu, macOS, and Windows with Python 3.11, 3.12, and 3.13.
 
@@ -244,7 +244,7 @@ This project uses [Release Please](https://github.com/googleapis/release-please)
 | `fix:` | Bug fix | Patch (0.1.0 → 0.1.1) |
 | `feat!:` or `fix!:` | Breaking change | Major (0.1.0 → 1.0.0) |
 | `docs:` | Documentation | Patch |
-| `chore:` | Maintenance | No release |
+| `chore:` | Maintenance | No Release PR triggered, it'll just be part of the next release |
 
 **Examples:**
 ```bash
