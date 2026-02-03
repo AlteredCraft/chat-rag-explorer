@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>About - RAG Lab</title>
+        <link rel="stylesheet" href="/static/style.css" />
+    </head>
+    <body>
+        <!-- Skip link for keyboard navigation -->
+        <a href="#about-content" class="skip-link">Skip to content</a>
+
+        <div class="settings-layout">
+            <main class="settings-container" role="main">
+                <header>
+                    <div class="header-content">
+                        <a href="/" class="back-link" aria-label="Return to chat">&larr; Back to Chat</a>
+                        <h1>About RAG Lab</h1>
+                    </div>
+                </header>
+
+                <div id="about-content" class="settings-content about-content">
+                    <section class="about-section">
+                        <h2>Purpose</h2>
+                        <p>
+                            RAG Lab is an educational application designed to demonstrate the implementation of a
+                            chat interface with Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG).
+                        </p>
+                        <p>
+                            Interested in a RAG workshop for your team? Contact
+                            <a href="mailto:info@alteredcraft.com">info@alteredcraft.com</a>.
+                            See <a href="https://lu.ma/altered-craft-workshops?k=c&period=past" target="_blank" rel="noopener">past workshop deliveries</a> for examples.
+                        </p>
+                    </section>
+
+                    <section class="about-section">
+                        <h2>Technology Stack</h2>
+                        <ul class="tech-list">
+                            <li><strong>Backend:</strong> Flask (Python)</li>
+                            <li><strong>LLM Access:</strong> OpenRouter (GPT-4, Claude, Llama, etc.)</li>
+                            <li><strong>Vector Database:</strong> ChromaDB</li>
+                            <li><strong>Frontend:</strong> Vanilla JavaScript (no framework)</li>
+                        </ul>
+                    </section>
+
+                    <section class="about-section">
+                        <h2>Features</h2>
+                        <div class="feature-highlight">
+                            <h3>Inspect Request Details</h3>
+                            <p>
+                                Click "view details" on any message to see exactly what the LLM received—model,
+                                parameters, token counts, timing, and retrieved RAG documents with their source
+                                metadata and similarity scores.
+                            </p>
+                            <div class="feature-images">
+                                <img src="/static/img/inspect-chat-button.png" alt="Inspect button on chat message" />
+                                <img src="/static/img/inspect-chat-details.png" alt="Request details modal showing model, tokens, and RAG documents" />
+                            </div>
+                        </div>
+                        <div class="features-grid">
+                            <div class="feature-card">
+                                <h3>Real-time Streaming</h3>
+                                <p>Server-Sent Events (SSE) stream LLM responses token-by-token for a responsive chat experience.</p>
+                            </div>
+                            <div class="feature-card">
+                                <h3>Model Selection</h3>
+                                <p>Dynamic model picker with OpenRouter models, filtered to RAG-recommended options.</p>
+                            </div>
+                            <div class="feature-card">
+                                <h3>Conversation History</h3>
+                                <p>Multi-turn conversation support with full context retention.</p>
+                            </div>
+                            <div class="feature-card">
+                                <h3>Session Metrics</h3>
+                                <p>Real-time token usage tracking for both individual interactions and session totals.</p>
+                            </div>
+                            <div class="feature-card">
+                                <h3>RAG Integration</h3>
+                                <p>Retrieve relevant documents from ChromaDB and inject them as context for the LLM.</p>
+                            </div>
+                            <div class="feature-card">
+                                <h3>Markdown Rendering</h3>
+                                <p>Secure rendering using Marked.js and DOMPurify, bundled locally for offline use.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="about-section">
+                        <h2>Architecture Highlights</h2>
+                        <ul class="architecture-list">
+                            <li><strong>Application Factory Pattern:</strong> Flask best practices for modular, testable code</li>
+                            <li><strong>Singleton Services:</strong> Chat, RAG config, prompts, and history services</li>
+                            <li><strong>Request ID Correlation:</strong> All API endpoints include unique IDs for log tracing</li>
+                            <li><strong>ChromaDB Modes:</strong> Supports local files, server connections, and cloud deployment</li>
+                        </ul>
+                    </section>
+
+                    <section class="about-section">
+                        <h2>Getting Started</h2>
+                        <p>
+                            RAG Lab requires Python 3.11+ and an <a href="https://openrouter.ai/" target="_blank" rel="noopener">OpenRouter</a> API key.
+                            A sample ChromaDB with pre-embedded documents is included to get started quickly.
+                        </p>
+                        <p>
+                            For full setup instructions and documentation, see the project's README file.
+                        </p>
+                    </section>
+
+                </div>
+            </main>
+        </div>
+    </body>
+</html>

@@ -4,6 +4,7 @@ Flask routes and API endpoints.
 Web Pages:
 - / : Main chat interface
 - /settings : Configuration page
+- /about : About page with project information
 
 API Endpoints:
 - /api/chat : POST - Stream chat completions from LLM
@@ -118,6 +119,12 @@ def get_status():
 def settings():
     logger.debug("Serving settings page")
     return render_template("settings.html")
+
+
+@main_bp.route("/about")
+def about():
+    logger.debug("Serving about page")
+    return render_template("about.html")
 
 
 @main_bp.route("/api/models")

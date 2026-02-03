@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- About page (`/about`) with project overview, tech stack, features, and architecture
+- About link in sidebar header next to Settings
+- Highlighted "Inspect Request Details" feature in README and About page with screenshots
+- Workshop calendar link (lu.ma) showing past deliveries
 - Educational info box on Settings page showing `.models_list` file status
 - Info box displays whether file exists and count of configured models
 - Link to openrouter.ai/models for browsing available models

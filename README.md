@@ -1,6 +1,6 @@
 # RAG Lab
 
-An educational application designed to demonstrate the implementation of a Chat interface with Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG). This project is used as a teaching aid for hands-on RAG workshops, such as [Building RAG Applications](https://alteredcraft.github.io/workshop-rag-basics/). Interested in having a similar course delivered to your team? Contact [info@alteredcraft.com](mailto:info@alteredcraft.com).
+An educational application designed to demonstrate the implementation of a Chat interface with Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG). Interested in a RAG workshop for your team? Contact [info@alteredcraft.com](mailto:info@alteredcraft.com). See [past workshop deliveries](https://lu.ma/altered-craft-workshops?k=c&period=past) for examples.
 
 This project uses **Flask** for the backend, **OpenRouter** for LLM access (supporting models like GPT-4, Claude 3, Llama 3, etc.), and **vanilla JavaScript** for a clean, streaming chat interface. The app can start without an API key configured, displaying helpful setup instructions in the UI.
 
@@ -43,6 +43,11 @@ This project uses **Flask** for the backend, **OpenRouter** for LLM access (supp
     Open your browser to [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ## Features
+
+*   **Inspect Request Details**: Click "view details" on any message to see exactly what the LLM received—model, parameters, token counts, timing, and retrieved RAG documents with their source metadata and similarity scores.
+
+    ![Inspect button on chat message](docs/img/inspect-chat-button.png)
+    ![Request details modal](docs/img/inspect-chat-details.png)
 
 *   **Real-time Streaming**: Server-Sent Events (SSE) to stream LLM responses token-by-token
 *   **Model Selection**: Dynamic model picker with OpenRouter models, filtered to RAG-recommended models via `.models_list`
