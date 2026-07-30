@@ -136,39 +136,37 @@ def chunk_by_tokens(content: str, chunk_size: int = 256, overlap: int = 50) -> l
     if not content.strip():
         return []
 
-    # Create a chunking tokenizer with truncation enabled
-    chunking_tokenizer = Tokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
-    chunking_tokenizer.enable_truncation(max_length=chunk_size, stride=overlap, strategy="longest_first")
-    chunking_tokenizer.no_padding()
+    # Encode once, without truncation, so we can see where every token sits in the
+    # original text. We then slide our own window over those positions rather than
+    # relying on the tokenizer's built-in overflow, whose behavior has changed
+    # between tokenizers releases (0.23 returns only a single overflow segment,
+    # which silently dropped most of each document).
+    encoded = TOKENIZER.encode(content)
 
-    # Encode with overflowing tokens
-    encoded = chunking_tokenizer.encode(content)
+    # Special tokens such as [CLS]/[SEP] carry empty (0, 0) offsets. Drop them so
+    # every remaining offset maps to real characters in the source text.
+    offsets = [(start, end) for start, end in encoded.offsets if start != end]
+    if not offsets:
+        return []
 
-    # Collect all chunks using character offsets from the original text
-    # This preserves the original formatting instead of reconstructing from tokens
+    # Each window advances by chunk_size minus the overlap we want to keep.
+    step = max(1, chunk_size - overlap)
+
+    # Slice the original text with each window's first and last character offsets,
+    # which preserves formatting instead of reconstructing text from tokens.
     chunks = []
+    for window_start in range(0, len(offsets), step):
+        window = offsets[window_start:window_start + chunk_size]
+        if not window:
+            break
 
-    def extract_chunk_text(encoding) -> str:
-        """Extract original text using token offsets."""
-        offsets = encoding.offsets
-        # Filter out special tokens (they have (0, 0) offsets)
-        valid_offsets = [(start, end) for start, end in offsets if start != end]
-        if not valid_offsets:
-            return ""
-        start_char = valid_offsets[0][0]
-        end_char = valid_offsets[-1][1]
-        return content[start_char:end_char].strip()
-
-    # First chunk
-    chunk_text = extract_chunk_text(encoded)
-    if chunk_text:
-        chunks.append(chunk_text)
-
-    # Overflowing chunks
-    for overflow_encoding in encoded.overflowing:
-        chunk_text = extract_chunk_text(overflow_encoding)
+        chunk_text = content[window[0][0]:window[-1][1]].strip()
         if chunk_text:
             chunks.append(chunk_text)
+
+        # This window already reached the end of the document.
+        if window_start + chunk_size >= len(offsets):
+            break
 
     return chunks
 

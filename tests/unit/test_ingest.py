@@ -235,6 +235,20 @@ class TestChunkByTokens:
             # Allow some tolerance for tokenizer behavior
             assert token_count <= 110, f"Chunk has {token_count} tokens"
 
+    def test_all_content_is_covered(self):
+        """Every word must land in some chunk - no content silently dropped."""
+        words = [f"word{i}" for i in range(500)]
+        content = " ".join(words)
+
+        chunks = chunk_by_tokens(content, chunk_size=50, overlap=10)
+
+        covered = set()
+        for chunk in chunks:
+            covered.update(chunk.split())
+
+        missing = [word for word in words if word not in covered]
+        assert not missing, f"{len(missing)} words dropped, e.g. {missing[:5]}"
+
     def test_overlap_creates_redundancy(self):
         """Chunks should have overlapping content."""
         content = " ".join([f"word{i}" for i in range(200)])
