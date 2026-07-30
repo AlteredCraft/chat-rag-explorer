@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1](https://github.com/AlteredCraft/chat-rag-explorer/compare/chat-rag-explorer-v0.2.0...chat-rag-explorer-v0.2.1) (2026-07-30)
+
+
+### Bug Fixes
+
+* cover full document when chunking by tokens ([565c116](https://github.com/AlteredCraft/chat-rag-explorer/commit/565c11682d2add4d18b239d8ed9b7f9cbbb83a09))
+
 ## [0.2.0](https://github.com/AlteredCraft/chat-rag-explorer/compare/chat-rag-explorer-v0.1.0...chat-rag-explorer-v0.2.0) (2026-02-03)
 
 
