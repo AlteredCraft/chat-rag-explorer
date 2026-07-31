@@ -20,7 +20,12 @@ load_dotenv()
 class Config:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-    DEFAULT_MODEL = "openai/gpt-3.5-turbo"
+
+    # Model used when a request specifies none. Must also be listed in
+    # .models_list and mirrored in static/script.js and static/settings.js,
+    # since the browser sends a model ID on every chat request.
+    # tests/unit/test_config.py enforces both rules.
+    DEFAULT_MODEL = "deepseek/deepseek-v4-flash"
 
     # ChromaDB Configuration
     CHROMADB_API_KEY = os.getenv("CHROMADB_API_KEY")

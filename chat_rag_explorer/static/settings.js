@@ -114,7 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const STORAGE_KEY = 'chat-rag-selected-model';
     const FILTER_STORAGE_KEY = 'chat-rag-free-filter';
-    const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
+    // Keep in sync with DEFAULT_MODEL in config.py (enforced by tests/unit/test_config.py)
+    const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
 
     // Prompt editor elements and constants
     const PROMPT_STORAGE_KEY = 'chat-rag-selected-prompt';
