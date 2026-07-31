@@ -3,103 +3,176 @@
 [![Tests](https://github.com/AlteredCraft/chat-rag-explorer/actions/workflows/test.yml/badge.svg)](https://github.com/AlteredCraft/chat-rag-explorer/actions/workflows/test.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/AlteredCraft/chat-rag-explorer?filter=chat-rag-explorer-*)](https://github.com/AlteredCraft/chat-rag-explorer/releases)
 
-Tested on Ubuntu, macOS, and Windows with Python 3.11, 3.12, and 3.13.
+A working chat application you can read end to end. It demonstrates two things that are hard to learn from articles alone: how a **streaming** LLM chat interface actually works, and how **Retrieval-Augmented Generation (RAG)** injects your own documents into a model's context.
 
-An educational application designed to demonstrate the implementation of a Chat interface with Large Language Models (LLMs) and Retrieval-Augmented Generation (RAG). Interested in a RAG workshop for your team? Contact [info@alteredcraft.com](mailto:info@alteredcraft.com). See [past workshop deliveries](https://lu.ma/altered-craft-workshops?k=c&period=past) for examples.
+The stack is deliberately small so the interesting parts stay visible — **Flask** on the backend, **vanilla JavaScript** on the frontend (no build step, no framework), **OpenRouter** for model access, and **ChromaDB** as the vector store.
 
-This project uses **Flask** for the backend, **OpenRouter** for LLM access (supporting models like GPT-4, Claude 3, Llama 3, etc.), and **vanilla JavaScript** for a clean, streaming chat interface. The app can start without an API key configured, displaying helpful setup instructions in the UI.
+The most useful feature for learning is **Inspect Request Details**. Click "view details" on any message to see exactly what the model received — the full augmented prompt, the retrieved documents with their similarity scores, token counts, and timing. Most of RAG's behavior becomes obvious once you can see this.
 
-## Prerequisites
+![Inspect button on chat message](docs/img/inspect-chat-button.png)
+![Request details modal](docs/img/inspect-chat-details.png)
 
-*   Python 3.11+
-*   [uv](https://github.com/astral-sh/uv) (for package management)
-*   An [OpenRouter](https://openrouter.ai/) API Key
+> Interested in a RAG workshop for your team? Contact [info@alteredcraft.com](mailto:info@alteredcraft.com), or see [past workshop deliveries](https://lu.ma/altered-craft-workshops?k=c&period=past). Attending a workshop? Start with [docs/PREWORK.md](docs/PREWORK.md) instead.
 
-## Quick Start
+## Before you start
 
-1.  **Clone the repository**
-    ```bash
-    git clone https://github.com/yourusername/chat-rag-explorer.git
-    cd chat-rag-explorer
-    uv sync
-    uv run pytest
-    ```
+| You need | Notes |
+|----------|-------|
+| [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) | To clone the repo. No Git? [Download the ZIP](https://github.com/AlteredCraft/chat-rag-explorer/archive/refs/heads/main.zip) instead. |
+| [uv](https://docs.astral.sh/uv/getting-started/installation/) | Installs Python and every dependency for you. You do **not** need Python installed first. |
+| An [OpenRouter API key](https://openrouter.ai/keys) | One key reaches many models. See [cost](#what-this-costs) below. |
 
-2.  **Set up the environment variables**
-    🛑 If the app is running, first stop it (Ctrl+C).
+You should be comfortable running commands in a terminal. If that's new, start here: [macOS](https://support.apple.com/guide/terminal/welcome/mac) · [Windows](https://learn.microsoft.com/en-us/windows/terminal/) · [Linux](https://documentation.ubuntu.com/desktop/en/latest/tutorial/the-linux-command-line-for-beginners/).
 
-    ```bash
-    cp .env.example .env
-    ```
-    Edit `.env` and add your API key:
-    ```env
-    OPENROUTER_API_KEY=sk-or-v1-your-key-here
-    ```
-    See [Logging Configuration](#logging-configuration) for optional logging settings.
+## Get it running
 
-3.  **Run the application**
-    ```bash
-    uv run main.py
-    ```
+Five steps, start to finish.
 
-    > **Port in use?** The app auto-finds an available port (8000-8004).
+**1. Clone the repo and install dependencies**
 
-4.  **Explore**
-    Open your browser to [http://127.0.0.1:8000](http://127.0.0.1:8000).
-
-## Features
-
-*   **Inspect Request Details**: Click "view details" on any message to see exactly what the LLM received—model, parameters, token counts, timing, and retrieved RAG documents with their source metadata and similarity scores.
-
-    ![Inspect button on chat message](docs/img/inspect-chat-button.png)
-    ![Request details modal](docs/img/inspect-chat-details.png)
-
-*   **Real-time Streaming**: Server-Sent Events (SSE) to stream LLM responses token-by-token
-*   **Model Selection**: Dynamic model picker with OpenRouter models, filtered to RAG-recommended models via `.models_list`
-*   **Conversation History**: Multi-turn conversation support with context retention
-*   **Metrics Sidebar**: Real-time session metrics including token usage
-*   **Markdown Support**: Secure rendering using Marked.js and DOMPurify (works offline)
-*   **Clean UI**: Responsive interface built with vanilla HTML/CSS/JS
-
-## Model Selection
-
-The app filters available OpenRouter models to those listed in `.models_list`. This file contains models that perform well in RAG scenarios. To customize the available models, edit `.models_list`:
-
-```
-# One model ID per line, comments start with #
-openai/gpt-4.1-mini
-anthropic/claude-sonnet-4
-google/gemini-2.0-flash-001
+```bash
+git clone https://github.com/AlteredCraft/chat-rag-explorer.git
+cd chat-rag-explorer
+uv sync
 ```
 
-Delete `.models_list` to show all OpenRouter models (⚠️ hundreds of options, though many not meant for use in chat).
+`uv sync` reads `pyproject.toml` and `uv.lock`, installs the correct Python version, and builds an isolated environment in `.venv/`. Nothing is installed system-wide.
 
-## RAG (Retrieval-Augmented Generation)
+**2. Confirm the install worked**
 
-RAG integration allows the chat to retrieve relevant documents from ChromaDB and inject them as context for the LLM. See [docs/RAG.md](docs/RAG.md) for detailed documentation.
+```bash
+uv run pytest
+```
 
-**Quick Start:**
-1. Go to Settings > RAG Settings
-2. Configure your ChromaDB connection (local, server, or cloud)
-3. Test connection and select a collection
-4. Enable RAG toggle in chat sidebar
+You should see all tests pass. These run entirely offline — no API key and no network needed — so this is a clean check that your environment is sound before any credentials enter the picture.
 
-> **Sample Data Included**: A pre-built ChromaDB with 195 chunks from "The Morn Chronicles" (a Star Trek DS9 fan fiction) is automatically copied to `data/chroma_db/` on first startup. Use path `data/chroma_db` in RAG Settings.
+**3. Add your API key**
 
-## Content Preparation
+```bash
+cp .env.example .env
+```
 
-To ingest your own documents for RAG retrieval, see the [utils/README.md](utils/README.md) for CLI tools:
+Open `.env` and set your key:
 
-- **split.py** - Split large markdown files into chapters by heading pattern
-- **ingest.py** - Two-phase workflow: preview chunks → inspect → ingest to ChromaDB
+```env
+OPENROUTER_API_KEY=sk-or-v1-your-key-here
+```
 
-The ingest tool writes human-readable chunk previews to `data/chunks/` so you can tune chunking parameters before committing to the vector database.
+`.env` is gitignored, so your key will not be committed. Every other setting in that file is optional and already has a sensible default.
+
+**4. Start the app**
+
+```bash
+uv run main.py
+```
+
+**5. Open it**
+
+Go to the URL printed in your terminal — [http://127.0.0.1:8000](http://127.0.0.1:8000) unless port 8000 was busy. Send a message and you should see the response stream in a token at a time.
+
+> The app starts fine without an API key and tells you what's missing in the UI, so you can look around before step 3 if you'd rather.
+
+## Try RAG with the included sample data
+
+The repo ships with a pre-built vector database so you can see retrieval working immediately, without preparing any documents. It holds **429 chunks** drawn from 28 chapters of *The Morn Chronicles*, a Star Trek DS9 fan fiction. Deliberately obscure source material — the model has certainly never seen it, so anything it answers correctly had to come from retrieval rather than memory.
+
+1. Go to **Settings → RAG Settings**
+2. Choose **Local** mode and enter the path `data/chroma_db`
+3. Click **Test Connection**, then select the `morn-chronicles-256chunk-50overlap` collection
+4. **Save Settings**, return to chat, and switch on the **RAG** toggle in the sidebar
+5. Ask something only the source would know, such as *"How did Morn get his stool at Quark's bar?"*
+
+Now click **view details** on the answer. You'll see the retrieved chunks, their similarity scores, and the fully assembled prompt. Toggle RAG off and ask the same question again — the difference is the entire point of the exercise.
+
+Once that works, try a question the corpus *can't* answer and watch the similarity scores get worse. Retrieval always returns its best matches, even when the best available match is bad, and recognizing that failure mode is most of what separates a working RAG system from a confidently wrong one.
+
+> **First query is slow.** ChromaDB downloads its embedding model (~79 MB) the first time it embeds anything, then caches it in `~/.cache/chroma`. One-time delay; later queries are fast.
+
+Full details in [docs/RAG.md](docs/RAG.md).
+
+## New to these ideas?
+
+You don't need any of this up front — the app runs without it. Reach for these when you hit something you want to understand properly.
+
+| Concept | Where it shows up | Start here |
+|---------|-------------------|------------|
+| Virtual environments | `uv sync`, the `.venv/` directory | [Python venv tutorial](https://docs.python.org/3/tutorial/venv.html) |
+| Flask, routes, blueprints | `chat_rag_explorer/routes.py` | [Flask quickstart](https://flask.palletsprojects.com/en/stable/quickstart/) |
+| Server-Sent Events (SSE) | How responses stream in token by token | [MDN: Using SSE](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events) |
+| Tokens and context windows | The metrics sidebar, token counts | [OpenRouter docs](https://openrouter.ai/docs) |
+| Embeddings | Turning text into vectors for search | [Google ML Crash Course](https://developers.google.com/machine-learning/crash-course/embeddings) |
+| Vector databases | ChromaDB, collections, similarity | [Chroma docs](https://docs.trychroma.com/) |
+| RAG as a pattern | The whole point of the app | [What is RAG?](https://aws.amazon.com/what-is/retrieval-augmented-generation/) · [docs/RAG.md](docs/RAG.md) |
+| Chunking and overlap | `utils/ingest.py` parameters | [utils/README.md](utils/README.md) |
+| pytest | `tests/` | [pytest getting started](https://docs.pytest.org/en/stable/getting-started.html) |
+
+## What this costs
+
+OpenRouter is pay-as-you-go, and you are billed per token by whichever model you select. Ordinary experimentation with this app runs to cents, not dollars, but it is not free by default.
+
+Two things worth doing if you're watching your budget. Set a [spending limit](https://openrouter.ai/settings/credits) on your account. And note that OpenRouter offers [free models](https://openrouter.ai/models?max_price=0) — though they won't appear in the picker until you add their IDs to `.models_list`, since that file ships with a curated paid set (see [Model Selection](#model-selection)).
+
+## Platform support
+
+Developed and manually tested on **macOS** — that's the best-supported path and the one to prefer if you have the choice.
+
+Automated tests run in GitHub Actions across **Ubuntu, macOS, and Windows** on **Python 3.11, 3.12, and 3.13** (see [the workflow](.github/workflows/test.yml)). So the Windows test suite is genuinely green, but no one clicks through the running app on Windows before a release. Windows should work; it's just less traveled. If something is off there, that's a real bug and we want to hear about it.
+
+## Getting help
+
+Something broken, unclear, or just wrong? [**Open an issue**](https://github.com/AlteredCraft/chat-rag-explorer/issues) — include your OS, your Python version (`uv run python --version`), and what you expected versus what happened. Documentation gaps are legitimate issues; if you got stuck, the docs failed you.
+
+Workshop attendees can also reach us at [info@alteredcraft.com](mailto:info@alteredcraft.com).
+
+### Common snags
+
+| Symptom | Fix |
+|---------|-----|
+| `uv: command not found` | Restart your terminal after installing uv so your `PATH` updates. |
+| Port already in use | The app tries 8000–8004 automatically. To pin one, set `SERVER_PORT` in `.env`. |
+| API key errors | Check `.env` exists (not just `.env.example`) and the key starts with `sk-or-v1-`. |
+| First RAG query hangs | It's downloading the ~79 MB embedding model. Let it finish once. |
+| "No collections found" | Confirm the path is `data/chroma_db` and that the app has been started at least once — it creates that directory on first run. |
 
 ---
 
 # Learn More
 
-The sections below provide deeper insight into the application's architecture, testing, logging system, and development roadmap.
+Deeper reference on architecture, testing, logging, and the release process.
+
+## Features
+
+*   **Inspect Request Details**: See the exact payload sent to the model — parameters, token counts, timing, and retrieved RAG documents with source metadata and similarity scores
+*   **Real-time Streaming**: Server-Sent Events (SSE) stream responses token by token
+*   **Model Selection**: Model picker populated from OpenRouter, filtered by `.models_list`
+*   **Conversation History**: Multi-turn conversations with context retention
+*   **Metrics Sidebar**: Live session metrics including token usage
+*   **Markdown Support**: Secure rendering via Marked.js and DOMPurify (bundled locally, works offline)
+*   **Clean UI**: Responsive interface in vanilla HTML/CSS/JS
+
+## Model Selection
+
+The model picker is filtered to the models listed in `.models_list`, a curated set that behaves well in RAG scenarios. Edit the file to customize it:
+
+```
+# One model ID per line, comments start with #
+openai/gpt-5.2-chat
+anthropic/claude-sonnet-4.5
+google/gemini-3-flash-preview
+```
+
+Browse [OpenRouter's catalog](https://openrouter.ai/models) for IDs. Delete `.models_list` to show every OpenRouter model (⚠️ hundreds of entries, many unsuited to chat).
+
+## Content Preparation
+
+To ingest your own documents, see [utils/README.md](utils/README.md):
+
+- **split.py** — split a large markdown file into chapters by heading pattern
+- **ingest.py** — two-phase workflow: preview chunks → inspect → ingest to ChromaDB
+
+The ingest tool writes human-readable chunk previews to `data/chunks/` so you can tune chunk size and overlap *before* committing anything to the vector database. Reading those previews is the fastest way to build intuition for what chunking actually does.
+
+`data/corpus/` also ships with several other public-domain and open corpora (Benjamin Franklin's autobiography, Paul Graham essays, D&D SRD, WikiVoyage, and more) if you want something larger to experiment with.
 
 ## Architecture
 
@@ -139,20 +212,21 @@ chat-rag-explorer/
 
 ### Design Patterns
 
-*   **Modular Architecture**: Flask Blueprints and Application Factory pattern
+*   **Modular Architecture**: Flask [Blueprints](https://flask.palletsprojects.com/en/stable/blueprints/) and the [Application Factory](https://flask.palletsprojects.com/en/stable/patterns/appfactories/) pattern
 *   **Centralized Logging**: Request ID correlation and configurable log levels
-*   **Modern Python Tooling**: Uses `uv` for fast dependency management
+*   **Modern Python Tooling**: `uv` for dependency management
 
-## Logging
+## Configuration
 
-The application features a comprehensive logging system for debugging and monitoring.
-
-### Logging Configuration
-
-Set these environment variables in your `.env` file:
+All settings live in `.env` (copied from `.env.example`). Only `OPENROUTER_API_KEY` is required.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `OPENROUTER_API_KEY` | — | **Required.** Your OpenRouter key |
+| `CHROMADB_API_KEY` | — | Only for ChromaDB cloud mode |
+| `SERVER_HOST` | `127.0.0.1` | Bind address |
+| `SERVER_PORT` | `8000` | Starting port |
+| `SERVER_PORT_RETRIES` | `5` | How many ports to try (8000–8004) |
 | `LOG_LEVEL_APP` | `DEBUG` | Log level for application code |
 | `LOG_LEVEL_DEPS` | `INFO` | Log level for dependencies (Flask, httpx, etc.) |
 | `LOG_TO_STDOUT` | `true` | Output logs to console |
@@ -161,9 +235,12 @@ Set these environment variables in your `.env` file:
 | `CHAT_HISTORY_ENABLED` | `false` | Enable chat interaction logging |
 | `CHAT_HISTORY_PATH` | `logs/chat-history.jsonl` | Path to chat history file |
 
-### Backend Logging
+## Logging
 
-**Startup Banner**: On application start, logs configuration summary with masked API key:
+### Backend
+
+**Startup Banner**: on start, logs a configuration summary with the API key masked:
+
 ```
 ============================================================
 RAG Lab - Starting up
@@ -175,7 +252,8 @@ Configuration:
 ============================================================
 ```
 
-**Request Correlation**: All API requests include a unique request ID for tracing:
+**Request Correlation**: every API request carries a unique 8-character request ID, so you can follow one request through the whole log:
+
 ```
 [a1b2c3d4] POST /api/chat - Model: openai/gpt-4, Messages: 3, Content length: 150 chars
 [a1b2c3d4] Starting chat stream - Model: openai/gpt-4
@@ -183,70 +261,69 @@ Configuration:
 [a1b2c3d4] POST /api/chat - Stream completed (1.523s, 42 chunks)
 ```
 
-**Performance Metrics**: Timing information for requests, including time-to-first-chunk (TTFC) for streams.
+**Performance Metrics**: timing for requests, including time-to-first-chunk (TTFC) for streams.
 
-### Frontend Logging
+### Frontend
 
-The browser console includes structured logs with session tracking:
+The browser console carries structured logs with session tracking:
+
 ```
 [2025-12-26T15:30:00.000Z] [sess_abc123] INFO: Chat request initiated {model: "openai/gpt-4", messageLength: 50}
 [2025-12-26T15:30:01.500Z] [sess_abc123] DEBUG: Time to first chunk {ttfc_ms: "823.45"}
 [2025-12-26T15:30:02.000Z] [sess_abc123] INFO: Chat response completed {chunks: 42, totalTime_ms: "1523.00"}
 ```
 
-Open browser DevTools (F12) -> Console to view frontend logs.
+Open DevTools ([F12](https://developer.chrome.com/docs/devtools/open)) → Console to view them.
 
 ## Testing
 
-The project uses pytest with randomized test ordering to catch hidden state dependencies.
-
-### Running Tests
+pytest with randomized test ordering, to catch tests that secretly depend on each other.
 
 ```bash
 uv run pytest                     # Run all tests (randomized order)
 uv run pytest -v                  # Verbose output
 uv run pytest -x                  # Stop on first failure
 uv run pytest --cov               # Run with coverage report
-uv run pytest -k "test_name"      # Run specific test by name
+uv run pytest -k "test_name"      # Run a specific test by name
 ```
 
 ### Multi-Version Testing
 
-Use [nox](https://nox.thea.codes/) to run tests across Python 3.11, 3.12, and 3.13:
+[nox](https://nox.thea.codes/) runs the suite across Python 3.11, 3.12, and 3.13 — the same versions CI uses:
 
 ```bash
-nox                               # Run on all Python versions
-nox -s tests-3.12                 # Run on specific version
-nox -- -x                         # Pass args to pytest
+uv run nox                        # Run on all Python versions
+uv run nox -s tests-3.12          # Run on a specific version
+uv run nox -- -x                  # Pass args through to pytest
 ```
 
 ### Test Philosophy
 
 *   **Unit tests** live in `tests/unit/` and must not make network calls
 *   External dependencies (ChromaDB, OpenRouter) are mocked
-*   Use `tmp_path` fixture for any file operations
-*   Tests run in random order to catch hidden state dependencies
+*   Use the `tmp_path` fixture for file operations
+*   Tests run in random order to surface hidden state dependencies
 
 ## Release Process
 
 This project uses [Release Please](https://github.com/googleapis/release-please) for automated versioning and changelog generation.
 
 **How it works:**
-1. All commits to `main` must use [Conventional Commits](https://www.conventionalcommits.org/) format
-2. Release Please automatically creates/updates a Release PR with version bumps and changelog
-3. Merge the Release PR when ready to cut a release
+1. All commits to `main` use [Conventional Commits](https://www.conventionalcommits.org/) format
+2. Release Please opens or updates a Release PR with the version bump and changelog
+3. Merge the Release PR to cut a release
 4. A GitHub Release and git tag are created automatically
 
 **Commit format:**
+
 | Prefix | Description | Version Bump |
 |--------|-------------|--------------|
 | `feat:` | New feature | Minor (0.1.0 → 0.2.0) |
 | `fix:` | Bug fix | Patch (0.1.0 → 0.1.1) |
 | `feat!:` or `fix!:` | Breaking change | Major (0.1.0 → 1.0.0) |
 | `docs:` | Documentation | Patch |
-| `chore:` | Maintenance | No Release PR triggered, it'll just be part of the next release |
+| `chore:` | Maintenance | No Release PR triggered; rolls into the next release |
 
-**Examples:**
 ```bash
 git commit -m "feat: add dark mode toggle"
 git commit -m "fix: correct token count in sidebar"
@@ -255,4 +332,4 @@ git commit -m "feat!: redesign REST API endpoints"
 
 ## License
 
-This project is open source and available under the [MIT License](LICENSE).
+Open source under the [MIT License](LICENSE).

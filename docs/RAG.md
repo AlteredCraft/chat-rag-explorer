@@ -1,15 +1,14 @@
 # RAG Integration
 
-This document describes the ChromaDB/RAG integration in RAG Lab.
+How the ChromaDB/RAG integration works in RAG Lab — the reference companion to the [README](../README.md).
 
-## Current Status: Complete
+## The idea in one paragraph
 
-The RAG integration is fully implemented. Users can:
-- Connect to ChromaDB databases (local, server, or cloud)
-- Browse and select collections
-- Configure retrieval settings (results count, distance threshold)
-- Toggle RAG on/off in the chat interface
-- See which documents were retrieved for each response
+A language model only knows what was in its training data plus what you put in the prompt. RAG is the second half of that: before calling the model, search your own documents for passages relevant to the question, then paste those passages into the prompt alongside it. The model isn't "learning" your documents — it's reading them, once, at question time. Everything below is machinery in service of that one move.
+
+The search step works on **embeddings**: each chunk of text is converted to a vector of numbers positioned so that similar meanings land near each other. Your question becomes a vector too, and retrieval returns the chunks nearest to it. "Nearest" is measured as **distance**, where lower means more similar — which is why a distance threshold is a quality filter. New to this? [Embeddings primer](https://developers.google.com/machine-learning/crash-course/embeddings) · [Chroma docs](https://docs.trychroma.com/).
+
+What the app gives you on top of that: connect to ChromaDB (local, server, or cloud), browse collections, tune retrieval settings, toggle RAG per conversation, and inspect exactly which documents were retrieved for any response.
 
 ## Architecture
 
@@ -160,7 +159,9 @@ For local mode, the service validates:
 
 ## Sample Data
 
-A pre-built ChromaDB with 195 chunks from "The Morn Chronicles" (a Star Trek DS9 fan fiction, 28 chapters) is included in the repository. On first startup, the app automatically copies the pristine sample from `data/chroma_db_sample/` to `data/chroma_db/` (which is gitignored) to prevent git deltas from ChromaDB's internal file mutations.
+A pre-built ChromaDB with 429 chunks from "The Morn Chronicles" (a Star Trek DS9 fan fiction, 28 chapters) is included in the repository, in the collection `morn-chronicles-256chunk-50overlap`. On first startup, the app automatically copies the pristine sample from `data/chroma_db_sample/` to `data/chroma_db/` (which is gitignored) to prevent git deltas from ChromaDB's internal file mutations.
+
+> **Point the app at `data/chroma_db`, never at `data/chroma_db_sample`.** ChromaDB writes to `chroma.sqlite3` even when it is only reading, so querying the sample directly dirties files that are committed to the repo. That is the whole reason the working copy exists.
 
 To use it:
 

@@ -1,6 +1,17 @@
 # Utils
 
-Command-line utilities for preparing markdown content for the RAG system.
+Command-line utilities for preparing markdown content for the RAG system. You don't need these to run the app — it ships with a ready-made sample database (see the [README](../README.md)). Reach for them when you want to load your *own* documents.
+
+## Chunking, briefly
+
+Retrieval doesn't search whole documents; it searches **chunks**. Before your documents can be searched, they have to be cut into pieces small enough to be individually meaningful and small enough to fit in a prompt alongside the question.
+
+Two parameters control the cut:
+
+- **`chunk_size`** — maximum tokens per chunk (default 256). A [token](https://openrouter.ai/docs) is roughly ¾ of a word. Too small and a chunk loses the context that made it meaningful; too large and retrieval returns a lot of irrelevant text along with the good part.
+- **`overlap`** — tokens each chunk repeats from the previous one (default 50). Without overlap, a sentence unlucky enough to straddle a boundary is split in half and may not match anything well.
+
+There is no universally correct setting — it depends on your documents. That is exactly why `ingest.py` makes you look at the chunks before committing them.
 
 ## ingest.py
 
