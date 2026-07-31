@@ -120,7 +120,9 @@ def load_models_list():
         return None
 
     models = set()
-    with open(models_list_path) as f:
+    # Read as UTF-8 explicitly so a non-ASCII comment does not break the file on
+    # Windows, where the default encoding is cp1252 rather than UTF-8.
+    with open(models_list_path, encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line and not line.startswith('#'):
@@ -142,7 +144,8 @@ def get_models_list_status():
     count = 0
 
     if exists:
-        with open(models_list_path) as f:
+        # UTF-8 for the same reason as load_models_list above.
+        with open(models_list_path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith('#'):

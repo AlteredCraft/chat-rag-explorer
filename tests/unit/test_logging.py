@@ -113,3 +113,34 @@ class TestSetupLogging:
         root_logger = logging.getLogger()
         file_handlers = [h for h in root_logger.handlers if isinstance(h, logging.FileHandler)]
         assert len(file_handlers) == 1
+
+    def test_file_handler_writes_non_ascii(self, tmp_path):
+        """The log file must accept non-ASCII characters on any platform.
+
+        The startup banner logs '🚀' and '✓'. Without an explicit UTF-8 encoding
+        the handler uses the platform default, which on Windows is cp1252 and
+        cannot encode them - every such line is dropped with an error to stderr.
+        """
+        import chat_rag_explorer.logging as log_module
+        importlib.reload(log_module)
+
+        log_file = tmp_path / "logs" / "unicode.log"
+
+        class MockConfig:
+            LOG_TO_STDOUT = False
+            LOG_TO_FILE = True
+            LOG_FILE_PATH = str(log_file)
+            LOG_LEVEL_APP = "DEBUG"
+            LOG_LEVEL_DEPS = "INFO"
+
+        log_module.setup_logging(MockConfig)
+
+        file_handler = next(
+            h for h in logging.getLogger().handlers if isinstance(h, logging.FileHandler)
+        )
+        assert file_handler.encoding.lower().replace("-", "") == "utf8"
+
+        logging.getLogger("chat_rag_explorer").info("🚀 Running on: 127.0.0.1:8000")
+        file_handler.flush()
+
+        assert "🚀" in log_file.read_text(encoding="utf-8")

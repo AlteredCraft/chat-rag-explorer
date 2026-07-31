@@ -70,7 +70,9 @@ def setup_logging(config=None):
         file_path = get_config("LOG_FILE_PATH", "logs/app.log")
         # Ensure the logs directory exists
         Path(file_path).parent.mkdir(parents=True, exist_ok=True)
-        file_handler = logging.FileHandler(file_path)
+        # UTF-8 explicitly: log messages contain characters such as 🚀 and ✓, and
+        # the platform default is cp1252 on Windows, which cannot encode them.
+        file_handler = logging.FileHandler(file_path, encoding="utf-8")
         file_handler.setFormatter(formatter)
         handlers.append(file_handler)
 

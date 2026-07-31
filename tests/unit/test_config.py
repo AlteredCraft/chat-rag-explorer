@@ -26,7 +26,7 @@ def read_models_list_ids():
         return None
 
     ids = []
-    for line in models_list.read_text().splitlines():
+    for line in models_list.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if stripped and not stripped.startswith("#"):
             ids.append(stripped)
@@ -43,9 +43,12 @@ def read_frontend_default_model(js_filename):
     Returns:
         The model ID string, or None if the constant was not found
     """
+    # Read as UTF-8 explicitly. Windows defaults to the locale encoding (cp1252),
+    # which cannot decode the non-ASCII characters these files contain.
     js_path = PROJECT_ROOT / "chat_rag_explorer" / "static" / js_filename
     match = re.search(
-        r"""const DEFAULT_MODEL = ['"]([^'"]+)['"]""", js_path.read_text()
+        r"""const DEFAULT_MODEL = ['"]([^'"]+)['"]""",
+        js_path.read_text(encoding="utf-8"),
     )
     return match.group(1) if match else None
 

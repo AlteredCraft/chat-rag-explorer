@@ -298,6 +298,21 @@ class TestGetModelsListStatus:
 
         assert result == {"exists": True, "count": 3, "path": ".models_list"}
 
+    def test_non_ascii_comment_is_read(self):
+        """Non-ASCII content must decode regardless of the platform's locale.
+
+        The file is read as UTF-8 explicitly. Without that, Windows falls back to
+        cp1252 and a comment containing an em-dash or curly quote raises
+        UnicodeDecodeError, breaking the model picker entirely.
+        """
+        self.models_list_path.write_text(
+            "# Curated set — don't remove\nopenai/gpt-4\n", encoding="utf-8"
+        )
+
+        result = get_models_list_status()
+
+        assert result == {"exists": True, "count": 1, "path": ".models_list"}
+
     def test_file_with_comments_and_empty_lines(self):
         """Comments and empty lines are not counted."""
         self.models_list_path.write_text("# Comment\nopenai/gpt-4\n\nanthropic/claude-3\n")
