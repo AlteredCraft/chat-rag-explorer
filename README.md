@@ -152,16 +152,38 @@ Deeper reference on architecture, testing, logging, and the release process.
 
 ## Model Selection
 
-The model picker is filtered to the models listed in `.models_list`, a curated set that behaves well in RAG scenarios. Edit the file to customize it:
+Two separate things decide which model a request uses: `.models_list` controls **which models are offered**, and `DEFAULT_MODEL` controls **which one is chosen when the user hasn't picked**.
+
+### `.models_list` — what appears in the picker
+
+OpenRouter exposes hundreds of models, many of them unsuited to chat. This file narrows the picker to a curated set that behaves well in RAG scenarios. Edit it to customize:
 
 ```
 # One model ID per line, comments start with #
-openai/gpt-5.2-chat
+openai/gpt-5.6-luna
 anthropic/claude-sonnet-4.5
-google/gemini-3-flash-preview
+google/gemini-3.6-flash
 ```
 
-Browse [OpenRouter's catalog](https://openrouter.ai/models) for IDs. Delete `.models_list` to show every OpenRouter model (⚠️ hundreds of entries, many unsuited to chat).
+Blank lines and `#` comments are ignored. Browse [OpenRouter's catalog](https://openrouter.ai/models) for valid IDs — an ID that doesn't exist upstream simply won't appear.
+
+Delete the file entirely to show every OpenRouter model (⚠️ hundreds of entries). The Settings page reports whether the filter is active and how many models it lists.
+
+### `DEFAULT_MODEL` — what's selected before the user chooses
+
+The default is declared in **three** places, and they must agree:
+
+| Location | Role |
+|----------|------|
+| `config.py` | Backend fallback when a request arrives with no model specified |
+| `chat_rag_explorer/static/script.js` | What the chat page sends before anything is saved |
+| `chat_rag_explorer/static/settings.js` | What the Settings picker pre-selects |
+
+The browser sends a model ID on *every* chat request, so the frontend constants are what a first-time visitor actually gets — the backend fallback rarely fires in practice. Change the default in all three, and keep it present in `.models_list` or it won't be selectable.
+
+`tests/unit/test_config.py` enforces both rules, so drift fails the suite rather than surfacing as a confusing runtime error.
+
+> **Changed the default and nothing happened?** Your model choice is remembered in `localStorage` under `chat-rag-selected-model`, and a saved choice always wins over the default. To see the new default, pick a different model in Settings, or clear site data in your browser's DevTools (Application → Local Storage).
 
 ## Content Preparation
 
@@ -248,7 +270,7 @@ RAG Lab - Starting up
 Configuration:
   - OpenRouter Base URL: https://openrouter.ai/api/v1
   - OpenRouter API Key: sk-or-v1...6a0d
-  - Default Model: openai/gpt-3.5-turbo
+  - Default Model: deepseek/deepseek-v4-flash
 ============================================================
 ```
 
