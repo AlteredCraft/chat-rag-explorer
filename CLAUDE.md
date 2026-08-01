@@ -93,7 +93,9 @@ Do not edit pyproject.toml directly for dependencies.
 - Vanilla JS (no framework)
 - `static/script.js` - Main chat interface
 - `static/settings.js` - Settings page (model picker, prompts, RAG config)
+- `static/escape-html.js` - Shared `escapeHtml()` helper, loaded before both page scripts
 - Uses Marked.js + DOMPurify for markdown rendering (bundled locally)
+- Every server-derived value interpolated into an `innerHTML` template must go through `escapeHtml()`; LLM markdown output goes through DOMPurify instead
 
 **Configuration Storage**
 - User settings stored in localStorage (model selection, prompts, tabs)

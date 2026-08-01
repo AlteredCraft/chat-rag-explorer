@@ -185,6 +185,18 @@ class TestPageRoutes:
         assert response.status_code == 200
         assert b"<!DOCTYPE html>" in response.data or b"<html" in response.data
 
+    @pytest.mark.parametrize(
+        "path,page_script",
+        [("/", "/static/script.js"), ("/settings", "/static/settings.js")],
+    )
+    def test_page_loads_escape_helper_before_page_script(self, path, page_script, client):
+        """Both pages load escape-html.js before the script that calls escapeHtml()."""
+        body = client.get(path).get_data(as_text=True)
+        helper_tag = '<script src="/static/escape-html.js"></script>'
+
+        assert helper_tag in body
+        assert body.index(helper_tag) < body.index(f'<script src="{page_script}">')
+
 
 class TestGetStatus:
     """Tests for GET /api/status."""
