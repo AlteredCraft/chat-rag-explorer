@@ -18,7 +18,15 @@ os.environ.setdefault("LLM_PROVIDER", "openrouter")
 
 @pytest.fixture
 def app():
-    """Create Flask application for testing."""
+    """Create Flask application for testing.
+
+    create_app() reads the real Config, which loads the developer's .env,
+    so every setting a test asserts a default for is pinned here. Without
+    that, a perfectly reasonable .env (CHAT_HISTORY_ENABLED=true, say)
+    fails tests on one machine and passes on another - and passes in CI
+    only because CI has no .env at all. Tests that need a different value
+    override app.config themselves.
+    """
     from chat_rag_explorer import create_app
 
     app = create_app()
@@ -26,6 +34,7 @@ def app():
         "TESTING": True,
         "LLM_API_KEY": "test-api-key-for-testing",
         "LLM_PROVIDER": "openrouter",
+        "CHAT_HISTORY_ENABLED": False,
     })
     yield app
 

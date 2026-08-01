@@ -3,14 +3,40 @@ Unit tests for config.py.
 
 Tests environment variable loading and default values.
 """
+import importlib
 import os
 import re
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent
+
+
+@contextmanager
+def reloaded_config(env=None):
+    """Reload config.py with `env` as the entire environment.
+
+    config.py calls load_dotenv() at import, which reads the real .env
+    from disk. Reloading without neutralizing that would refill the
+    environment these tests just cleared, making assertions about
+    defaults depend on whatever the developer happens to have in .env -
+    and pass in CI only because CI has no .env at all. Patching it out
+    means these tests check config.py's defaults, not the machine's.
+
+    Always reloads once more on the way out so later tests see the real
+    configuration.
+    """
+    import config
+
+    try:
+        with patch.dict(os.environ, env or {}, clear=True), patch("dotenv.load_dotenv"):
+            importlib.reload(config)
+            yield config
+    finally:
+        importlib.reload(config)
 
 
 def read_models_list_ids():
@@ -77,101 +103,53 @@ class TestConfig:
 
     def test_default_log_level_app(self):
         """LOG_LEVEL_APP defaults to DEBUG when not set."""
-        with patch.dict(os.environ, {}, clear=True):
-            # Re-import to pick up new env
-            import importlib
-            import config
-            importlib.reload(config)
-
+        with reloaded_config({}) as config:
             assert config.Config.LOG_LEVEL_APP == "DEBUG"
 
     def test_custom_log_level_app(self):
         """LOG_LEVEL_APP reads from environment."""
-        with patch.dict(os.environ, {"LOG_LEVEL_APP": "WARNING"}, clear=True):
-            import importlib
-            import config
-            importlib.reload(config)
-
+        with reloaded_config({"LOG_LEVEL_APP": "WARNING"}) as config:
             assert config.Config.LOG_LEVEL_APP == "WARNING"
 
     def test_log_to_stdout_default_true(self):
         """LOG_TO_STDOUT defaults to True."""
-        with patch.dict(os.environ, {}, clear=True):
-            import importlib
-            import config
-            importlib.reload(config)
-
+        with reloaded_config({}) as config:
             assert config.Config.LOG_TO_STDOUT is True
 
     def test_log_to_stdout_false(self):
         """LOG_TO_STDOUT parses 'false' string correctly."""
-        with patch.dict(os.environ, {"LOG_TO_STDOUT": "false"}, clear=True):
-            import importlib
-            import config
-            importlib.reload(config)
-
+        with reloaded_config({"LOG_TO_STDOUT": "false"}) as config:
             assert config.Config.LOG_TO_STDOUT is False
 
     def test_server_port_default(self):
         """SERVER_PORT defaults to 8000."""
-        with patch.dict(os.environ, {}, clear=True):
-            import importlib
-            import config
-            importlib.reload(config)
-
+        with reloaded_config({}) as config:
             assert config.Config.SERVER_PORT == 8000
 
     def test_server_port_custom(self):
         """SERVER_PORT reads integer from environment."""
-        with patch.dict(os.environ, {"SERVER_PORT": "9000"}, clear=True):
-            import importlib
-            import config
-            importlib.reload(config)
-
+        with reloaded_config({"SERVER_PORT": "9000"}) as config:
             assert config.Config.SERVER_PORT == 9000
 
     def test_chat_history_enabled_default(self):
         """CHAT_HISTORY_ENABLED defaults to False."""
-        with patch.dict(os.environ, {}, clear=True):
-            import importlib
-            import config
-            importlib.reload(config)
-
+        with reloaded_config({}) as config:
             assert config.Config.CHAT_HISTORY_ENABLED is False
 
     def test_llm_base_url_is_empty_when_unset(self):
         """Config holds no endpoint default; providers.py supplies one per provider."""
-        import importlib
-        import config
-        try:
-            with patch.dict(os.environ, {}, clear=True):
-                importlib.reload(config)
-                assert config.Config.LLM_BASE_URL == ""
-        finally:
-            importlib.reload(config)
+        with reloaded_config({}) as config:
+            assert config.Config.LLM_BASE_URL == ""
 
     def test_llm_base_url_env_override(self):
         """Base URL can point at any OpenAI-compatible endpoint."""
-        import importlib
-        import config
-        try:
-            with patch.dict(os.environ, {"LLM_BASE_URL": "http://localhost:11434/v1"}, clear=True):
-                importlib.reload(config)
-                assert config.Config.LLM_BASE_URL == "http://localhost:11434/v1"
-        finally:
-            # Reload with the real environment so later tests see real values
-            importlib.reload(config)
+        with reloaded_config({"LLM_BASE_URL": "http://localhost:11434/v1"}) as config:
+            assert config.Config.LLM_BASE_URL == "http://localhost:11434/v1"
 
     def test_default_model_env_override(self):
         """DEFAULT_MODEL reads from environment."""
-        import importlib
-        import config
-        try:
-            with patch.dict(os.environ, {"DEFAULT_MODEL": "custom/model"}, clear=True):
-                importlib.reload(config)
-                assert config.Config.DEFAULT_MODEL == "custom/model"
-        finally:
-            importlib.reload(config)
+        with reloaded_config({"DEFAULT_MODEL": "custom/model"}) as config:
+            assert config.Config.DEFAULT_MODEL == "custom/model"
 
     def test_llm_provider_has_no_default(self):
         """LLM_PROVIDER is required: unset resolves to empty, never a silent default.
@@ -180,36 +158,18 @@ class TestConfig:
         talking to OpenRouter without having chosen it. Startup validation
         reports the empty value instead.
         """
-        import importlib
-        import config
-        try:
-            with patch.dict(os.environ, {}, clear=True):
-                importlib.reload(config)
-                assert config.Config.LLM_PROVIDER == ""
-        finally:
-            importlib.reload(config)
+        with reloaded_config({}) as config:
+            assert config.Config.LLM_PROVIDER == ""
 
     def test_llm_provider_is_normalized(self):
         """LLM_PROVIDER tolerates stray whitespace and capitals."""
-        import importlib
-        import config
-        try:
-            with patch.dict(os.environ, {"LLM_PROVIDER": " Ollama "}, clear=True):
-                importlib.reload(config)
-                assert config.Config.LLM_PROVIDER == "ollama"
-        finally:
-            importlib.reload(config)
+        with reloaded_config({"LLM_PROVIDER": " Ollama "}) as config:
+            assert config.Config.LLM_PROVIDER == "ollama"
 
     def test_llm_api_key_has_no_default(self):
         """No placeholder in config; the per-provider fallback lives in providers.py."""
-        import importlib
-        import config
-        try:
-            with patch.dict(os.environ, {}, clear=True):
-                importlib.reload(config)
-                assert config.Config.LLM_API_KEY is None
-        finally:
-            importlib.reload(config)
+        with reloaded_config({}) as config:
+            assert config.Config.LLM_API_KEY is None
 
     def test_legacy_provider_specific_settings_are_gone(self):
         """The per-provider variables were collapsed into LLM_BASE_URL/LLM_API_KEY.
@@ -217,14 +177,11 @@ class TestConfig:
         Guards against a partial revert leaving a second source of truth
         that silently shadows the unified setting.
         """
-        import importlib
-        import config
-        importlib.reload(config)
-
-        for legacy in (
-            "OPENROUTER_API_KEY",
-            "OPENROUTER_BASE_URL",
-            "OLLAMA_API_KEY",
-            "OLLAMA_BASE_URL",
-        ):
-            assert not hasattr(config.Config, legacy)
+        with reloaded_config() as config:
+            for legacy in (
+                "OPENROUTER_API_KEY",
+                "OPENROUTER_BASE_URL",
+                "OLLAMA_API_KEY",
+                "OLLAMA_BASE_URL",
+            ):
+                assert not hasattr(config.Config, legacy)

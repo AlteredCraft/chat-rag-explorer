@@ -63,6 +63,11 @@ def validate_environment() -> None:
         logger.warning("API calls will fail until this is fixed.")
         logger.warning("=" * 60)
 
+    # Checked before the .env-missing branch below returns: the renamed
+    # settings can also be exported in the shell, so this is worth saying
+    # whether or not a .env exists.
+    _warn_about_renamed_settings()
+
     env_path = Path(__file__).parent / ".env"
 
     if not env_path.exists():
@@ -78,8 +83,6 @@ def validate_environment() -> None:
         logger.warning("=" * 60)
         return
 
-    _warn_about_renamed_settings()
-
     if Config.LLM_PROVIDER == "openrouter" and not Config.LLM_API_KEY:
         logger.warning("=" * 60)
         logger.warning("LLM_API_KEY is not set!")
@@ -90,9 +93,9 @@ def validate_environment() -> None:
 
 
 # Settings that were collapsed into LLM_BASE_URL / LLM_API_KEY, mapped to
-# their replacement. An .env carried over from an earlier version still
-# has these, and they are now ignored - which looks exactly like the app
-# losing your key unless we say so.
+# their replacement. An .env (or shell) carried over from an earlier
+# version still has these, and they are now ignored - which looks exactly
+# like the app losing your key unless we say so.
 RENAMED_SETTINGS = {
     "OPENROUTER_API_KEY": "LLM_API_KEY",
     "OLLAMA_API_KEY": "LLM_API_KEY",
@@ -102,13 +105,13 @@ RENAMED_SETTINGS = {
 
 
 def _warn_about_renamed_settings() -> None:
-    """Warn when .env still sets a variable that was renamed away."""
+    """Warn when a variable that was renamed away is still set."""
     stale = [name for name in RENAMED_SETTINGS if os.getenv(name)]
     if not stale:
         return
 
     logger.warning("=" * 60)
-    logger.warning("Your .env sets settings that are no longer used:")
+    logger.warning("Found settings that are no longer used:")
     for name in stale:
         logger.warning(f"  {name} -> renamed to {RENAMED_SETTINGS[name]}")
     logger.warning("These are ignored. Rename them so your settings take effect.")
