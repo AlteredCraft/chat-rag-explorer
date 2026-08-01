@@ -5,7 +5,7 @@ All settings can be customized via a .env file in the project root.
 See .env.example for available options and their defaults.
 
 Configuration Groups:
-- OpenRouter API: LLM provider settings
+- LLM Provider: provider selection (OpenRouter or Ollama) and connection settings
 - ChromaDB: Vector database connection (local/server/cloud modes)
 - Logging: Log levels, outputs, and file paths
 - Chat History: Conversation logging settings
@@ -18,10 +18,19 @@ load_dotenv()
 
 
 class Config:
+    # Which LLM provider serves chat and model listing: "openrouter"
+    # (default) or "ollama". See providers.py for the seam.
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openrouter").strip().lower()
+
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    # Any OpenAI-compatible endpoint works here (e.g. a local Ollama at
-    # http://localhost:11434/v1); OpenRouter is the default.
     OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+
+    # Ollama defaults to a local install. For Ollama cloud, point the base
+    # URL at https://ollama.com/v1 and set a real API key. A local Ollama
+    # has no auth, but the OpenAI SDK requires a non-empty key, so the
+    # default is a placeholder that keeps the app configured and working.
+    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+    OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
 
     # Model used when a request specifies none. The frontend fetches this
     # from /api/status, so this is the single source of truth. It must also

@@ -5,7 +5,7 @@
 
 A working chat application you can read end to end. It demonstrates two things that are hard to learn from articles alone: how a **streaming** LLM chat interface actually works, and how **Retrieval-Augmented Generation (RAG)** injects your own documents into a model's context.
 
-The stack is deliberately small so the interesting parts stay visible — **Flask** on the backend, **vanilla JavaScript** on the frontend (no build step, no framework), **OpenRouter** for model access, and **ChromaDB** as the vector store.
+The stack is deliberately small so the interesting parts stay visible — **Flask** on the backend, **vanilla JavaScript** on the frontend (no build step, no framework), **OpenRouter** (or a local [**Ollama**](#using-ollama-instead-of-openrouter)) for model access, and **ChromaDB** as the vector store.
 
 The most useful feature for learning is **Inspect Request Details**. Click "view details" on any message to see exactly what the model received — the full augmented prompt, the retrieved documents with their similarity scores, token counts, and timing. Most of RAG's behavior becomes obvious once you can see this.
 
@@ -20,7 +20,7 @@ The most useful feature for learning is **Inspect Request Details**. Click "view
 |----------|-------|
 | [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) | To clone the repo. No Git? [Download the ZIP](https://github.com/AlteredCraft/chat-rag-explorer/archive/refs/heads/main.zip) instead. |
 | [uv](https://docs.astral.sh/uv/getting-started/installation/) | Installs Python and every dependency for you. You do **not** need Python installed first. |
-| An [OpenRouter API key](https://openrouter.ai/keys) | One key reaches many models. See [cost](#what-this-costs) below. |
+| An [OpenRouter API key](https://openrouter.ai/keys) | One key reaches many models. See [cost](#what-this-costs) below. Prefer not to sign up for anything? Run models locally with [Ollama](#using-ollama-instead-of-openrouter) instead — no key needed. |
 
 You should be comfortable running commands in a terminal. If that's new, start here: [macOS](https://support.apple.com/guide/terminal/welcome/mac) · [Windows](https://learn.microsoft.com/en-us/windows/terminal/) · [Linux](https://documentation.ubuntu.com/desktop/en/latest/tutorial/the-linux-command-line-for-beginners/).
 
@@ -59,6 +59,8 @@ OPENROUTER_API_KEY=sk-or-v1-your-key-here
 ```
 
 `.env` is gitignored, so your key will not be committed. Every other setting in that file is optional and already has a sensible default.
+
+> Running models locally instead? Skip the key and set `LLM_PROVIDER=ollama` — see [Using Ollama instead of OpenRouter](#using-ollama-instead-of-openrouter).
 
 `.env` is read once at startup, so if the app is already running, stop it with `Ctrl+C` and start it again before your key takes effect.
 
@@ -142,7 +144,8 @@ Workshop attendees can also reach us at [info@alteredcraft.com](mailto:info@alte
 | `401` / `User not found` | The key reached OpenRouter and was rejected. It's invalid, revoked, or belongs to a deleted account — reissue at [openrouter.ai/keys](https://openrouter.ai/keys). A correctly *formatted* key can still be rejected. |
 | `402` / insufficient credits | The key is valid but the account is out of funds. [Add credit](https://openrouter.ai/settings/credits) or switch to a free model. |
 | Key set but still unauthorized | `.env` is read at startup only. Stop the app with `Ctrl+C` and start it again. |
-| Nothing in the model picker | Every ID in `.models_list` must exist upstream. Compare against [OpenRouter's catalog](https://openrouter.ai/models), or delete the file to show everything. |
+| Nothing in the model picker | Every ID in `.models_list` must exist upstream. Compare against [OpenRouter's catalog](https://openrouter.ai/models), or delete the file to show everything. Using Ollama? The file ships with OpenRouter IDs — see [Model Selection](#model-selection). |
+| "Could not reach ollama" | Ollama isn't running or the base URL is wrong. Start it with `ollama serve`, or check `OLLAMA_BASE_URL` in `.env`. |
 | First RAG query hangs | It's downloading the ~79 MB embedding model. Let it finish once. |
 | "No collections found" | Confirm the path is `data/chroma_db` and that the app has been started at least once — it creates that directory on first run. |
 
@@ -156,7 +159,7 @@ Deeper reference on architecture, testing, logging, and the release process.
 
 *   **Inspect Request Details**: See the exact payload sent to the model — parameters, token counts, timing, and retrieved RAG documents with source metadata and similarity scores
 *   **Real-time Streaming**: Server-Sent Events (SSE) stream responses token by token
-*   **Model Selection**: Model picker populated from OpenRouter, filtered by `.models_list`
+*   **Model Selection**: Model picker populated from the active provider (OpenRouter or Ollama), filtered by `.models_list`
 *   **Conversation History**: Multi-turn conversations with context retention
 *   **Metrics Sidebar**: Live session metrics including token usage
 *   **Markdown Support**: Secure rendering via Marked.js and DOMPurify (bundled locally, works offline)
@@ -179,7 +182,9 @@ google/gemini-3.6-flash
 
 Blank lines and `#` comments are ignored. Browse [OpenRouter's catalog](https://openrouter.ai/models) for valid IDs — an ID that doesn't exist upstream simply won't appear.
 
-Delete the file entirely to show every OpenRouter model (⚠️ hundreds of entries). The Settings page reports whether the filter is active and how many models it lists.
+Delete the file entirely to show every model the active provider offers (⚠️ hundreds of entries on OpenRouter). The Settings page reports whether the filter is active and how many models it lists.
+
+The filter treats model IDs as opaque strings, so it works for any provider — with Ollama the IDs are the model names you've pulled, like `llama3.2:3b`. Note that the file ships with OpenRouter IDs, so if you switch to Ollama, either replace them with your Ollama model names or delete the file (an Ollama install offers few enough models that the unfiltered picker stays manageable).
 
 ### `DEFAULT_MODEL` — what's selected before the user chooses
 
@@ -188,6 +193,41 @@ The default is declared once, in `config.py` (override it with the `DEFAULT_MODE
 Keep the default present in `.models_list` or it won't be selectable; `tests/unit/test_config.py` enforces that rule, so drift fails the suite rather than surfacing as a confusing runtime error.
 
 > **Changed the default and nothing happened?** Your model choice is remembered in `localStorage` under `chat-rag-selected-model`, and a saved choice always wins over the default. To see the new default, pick a different model in Settings, or clear site data in your browser's DevTools (Application → Local Storage).
+
+## Using Ollama instead of OpenRouter
+
+Everything the app sends to a model goes through the OpenAI-compatible chat completions API, so it can just as easily talk to [Ollama](https://ollama.com) — either a local install (free, private, no sign-up) or Ollama's cloud service.
+
+### Local Ollama
+
+1. [Install Ollama](https://ollama.com/download) and pull a model, e.g. `ollama pull llama3.2:3b`
+2. Make sure it's running (`ollama serve` if it isn't already)
+3. In `.env`, select the provider and a default model you've pulled:
+
+```env
+LLM_PROVIDER=ollama
+DEFAULT_MODEL=llama3.2:3b
+```
+
+4. Make the model selectable: add its name to `.models_list`, or delete that file to show everything Ollama offers (see [Model Selection](#model-selection))
+5. Restart the app
+
+No API key is involved — the app fills in a placeholder because the OpenAI SDK insists on one, and Ollama ignores it.
+
+### Ollama cloud
+
+Same as above, plus point the base URL at the cloud endpoint and set your [Ollama API key](https://ollama.com/settings/keys):
+
+```env
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=https://ollama.com/v1
+OLLAMA_API_KEY=your-ollama-key-here
+DEFAULT_MODEL=gpt-oss:120b
+```
+
+### What to expect in the picker
+
+Ollama's model listing reports only IDs — no display names, context lengths, or prices — so the Settings page shows the ID as the name, `N/A` for context length, and treats every model as free. Model IDs without a `/` also group under a single "Other" heading rather than by vendor. All cosmetic; chat, streaming, and RAG behave identically.
 
 ## Content Preparation
 
@@ -244,11 +284,14 @@ chat-rag-explorer/
 
 ## Configuration
 
-All settings live in `.env` (copied from `.env.example`). Only `OPENROUTER_API_KEY` is required.
+All settings live in `.env` (copied from `.env.example`). Only `OPENROUTER_API_KEY` is required — unless you use [Ollama](#using-ollama-instead-of-openrouter), which needs no key locally.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENROUTER_API_KEY` | — | **Required.** Your OpenRouter key |
+| `LLM_PROVIDER` | `openrouter` | Which provider serves chat: `openrouter` or `ollama` |
+| `OPENROUTER_API_KEY` | — | **Required** with OpenRouter. Your OpenRouter key |
+| `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Ollama endpoint; `https://ollama.com/v1` for cloud |
+| `OLLAMA_API_KEY` | `ollama` (placeholder) | Only needed for Ollama cloud |
 | `CHROMADB_API_KEY` | — | Only for ChromaDB cloud mode |
 | `SERVER_HOST` | `127.0.0.1` | Bind address |
 | `SERVER_PORT` | `8000` | Starting port |
@@ -272,8 +315,9 @@ All settings live in `.env` (copied from `.env.example`). Only `OPENROUTER_API_K
 RAG Lab - Starting up
 ============================================================
 Configuration:
-  - OpenRouter Base URL: https://openrouter.ai/api/v1
-  - OpenRouter API Key: sk-or-v1...6a0d
+  - LLM Provider: openrouter
+  - Base URL: https://openrouter.ai/api/v1
+  - API Key: sk-or-v1...6a0d
   - Default Model: deepseek/deepseek-v4-flash
 ============================================================
 ```

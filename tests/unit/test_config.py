@@ -169,3 +169,37 @@ class TestConfig:
                 assert config.Config.DEFAULT_MODEL == "custom/model"
         finally:
             importlib.reload(config)
+
+    def test_llm_provider_defaults_to_openrouter(self):
+        """LLM_PROVIDER defaults to openrouter when not set."""
+        import importlib
+        import config
+        try:
+            with patch.dict(os.environ, {}, clear=True):
+                importlib.reload(config)
+                assert config.Config.LLM_PROVIDER == "openrouter"
+        finally:
+            importlib.reload(config)
+
+    def test_llm_provider_is_normalized(self):
+        """LLM_PROVIDER tolerates stray whitespace and capitals."""
+        import importlib
+        import config
+        try:
+            with patch.dict(os.environ, {"LLM_PROVIDER": " Ollama "}, clear=True):
+                importlib.reload(config)
+                assert config.Config.LLM_PROVIDER == "ollama"
+        finally:
+            importlib.reload(config)
+
+    def test_ollama_defaults_to_local_with_placeholder_key(self):
+        """Ollama defaults target a local install and need no real key."""
+        import importlib
+        import config
+        try:
+            with patch.dict(os.environ, {}, clear=True):
+                importlib.reload(config)
+                assert config.Config.OLLAMA_BASE_URL == "http://localhost:11434/v1"
+                assert config.Config.OLLAMA_API_KEY == "ollama"
+        finally:
+            importlib.reload(config)

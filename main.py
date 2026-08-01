@@ -38,7 +38,8 @@ def validate_environment() -> None:
 
     Checks:
     - .env file exists in project root
-    - OPENROUTER_API_KEY is set and not empty
+    - OPENROUTER_API_KEY is set when OpenRouter is the active provider
+      (Ollama needs no key locally, so it is not checked)
 
     Logs warnings if validation fails but allows the app to start.
     The frontend will display appropriate messaging when API key is missing.
@@ -54,10 +55,11 @@ def validate_environment() -> None:
         logger.warning("  2. Add your OpenRouter API key to .env:")
         logger.warning("     OPENROUTER_API_KEY=your_api_key_here")
         logger.warning("Get an API key at: https://openrouter.ai/keys")
+        logger.warning("(Or run models locally: set LLM_PROVIDER=ollama - see README)")
         logger.warning("=" * 60)
         return
 
-    if not Config.OPENROUTER_API_KEY:
+    if Config.LLM_PROVIDER == "openrouter" and not Config.OPENROUTER_API_KEY:
         logger.warning("=" * 60)
         logger.warning("OPENROUTER_API_KEY is not set!")
         logger.warning("Add your OpenRouter API key to .env:")

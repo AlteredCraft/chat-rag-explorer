@@ -305,10 +305,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Group models by provider
+        // Group models by the vendor prefix of their ID. IDs without a
+        // "/" (e.g. Ollama's "llama3.2:3b") share one "Other" group
+        // instead of each becoming a single-model group.
         const grouped = {};
         filteredModels.forEach(model => {
-            const provider = model.id.split('/')[0] || 'Other';
+            const provider = model.id.includes('/') ? model.id.split('/')[0] : 'Other';
             if (!grouped[provider]) {
                 grouped[provider] = [];
             }

@@ -21,6 +21,12 @@ PROVIDER = Provider(
     api_key="test-key",
 )
 
+OLLAMA_PROVIDER = Provider(
+    name="ollama",
+    base_url="http://localhost:11434/v1",
+    api_key="ollama",
+)
+
 
 def _openai_status_error(status_code):
     """Build a real openai.APIStatusError carrying the given HTTP status."""
@@ -103,6 +109,24 @@ class TestDescribeChatError:
 
         assert message == "boom"
 
+    def test_ollama_connection_error_suggests_ollama_serve(self):
+        """An unreachable Ollama asks whether it is running."""
+        exc = openai.APIConnectionError(
+            request=httpx.Request("POST", "http://localhost:11434/v1/chat/completions")
+        )
+
+        message = describe_chat_error(exc, OLLAMA_PROVIDER)
+
+        assert "OLLAMA_BASE_URL" in message
+        assert "ollama serve" in message
+
+    def test_ollama_401_names_api_key_env_var(self):
+        """Ollama cloud rejecting a key points at OLLAMA_API_KEY."""
+        message = describe_chat_error(_openai_status_error(401), OLLAMA_PROVIDER)
+
+        assert "401" in message
+        assert "OLLAMA_API_KEY" in message
+
 
 class TestDescribeModelListError:
     """Tests for describe_model_list_error()."""
@@ -137,3 +161,12 @@ class TestDescribeModelListError:
 
         assert "openrouter" in message
         assert "kaput" in message
+
+    def test_ollama_connection_error_suggests_ollama_serve(self):
+        """Model listing against a stopped Ollama asks whether it is running."""
+        exc = requests.exceptions.ConnectionError("refused")
+
+        message = describe_model_list_error(exc, OLLAMA_PROVIDER)
+
+        assert "OLLAMA_BASE_URL" in message
+        assert "ollama serve" in message

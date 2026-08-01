@@ -78,7 +78,7 @@ Do not edit pyproject.toml directly for dependencies.
 
 **Backend Services (Singleton Pattern)**
 - `services.py` - `chat_service`: LLM streaming via OpenAI SDK pointed at the active provider
-- `providers.py` - Provider seam: connection details + model listing per OpenAI-compatible provider (OpenRouter today; built to add Ollama local/cloud without touching streaming code)
+- `providers.py` - Provider seam: connection details + model listing per OpenAI-compatible provider (OpenRouter and Ollama local/cloud, selected via `LLM_PROVIDER`; adding one never touches streaming code)
 - `rag_config_service.py` - `rag_config_service`: ChromaDB connection management (local/server/cloud modes)
 - `prompt_service.py` - `prompt_service`: System prompt CRUD operations
 - `chat_history_service.py` - `chat_history_service`: Conversation logging to JSONL

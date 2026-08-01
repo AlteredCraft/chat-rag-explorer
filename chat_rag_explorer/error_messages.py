@@ -7,17 +7,17 @@ failure states a user can actually fix - a bad API key, a wrong base
 URL, an unreachable service, a missing model - into plain-language
 messages that say what went wrong and where to fix it.
 
-The env-var maps are keyed by provider name so adding a provider (e.g.
-Ollama, issue #28) only needs new entries here, alongside the new branch
-in providers.get_active_provider().
+The env-var maps are keyed by provider name so adding a provider only
+needs new entries here, alongside the new branch in
+providers.get_active_provider().
 """
 import openai
 import requests
 
 # Where each provider's connection settings live in .env - used to point
 # the user at the exact setting to fix.
-API_KEY_ENV_VARS = {"openrouter": "OPENROUTER_API_KEY"}
-BASE_URL_ENV_VARS = {"openrouter": "OPENROUTER_BASE_URL"}
+API_KEY_ENV_VARS = {"openrouter": "OPENROUTER_API_KEY", "ollama": "OLLAMA_API_KEY"}
+BASE_URL_ENV_VARS = {"openrouter": "OPENROUTER_BASE_URL", "ollama": "OLLAMA_BASE_URL"}
 
 
 def missing_api_key_message(provider):
@@ -81,10 +81,13 @@ def describe_model_list_error(exc, provider):
 def _connection_message(provider):
     """Message for connection failures (wrong base URL, service down)."""
     env_var = BASE_URL_ENV_VARS.get(provider.name, "the provider base URL")
-    return (
+    message = (
         f"Could not reach {provider.name} at {provider.base_url}. "
         f"Check {env_var} in your .env file and that the service is reachable."
     )
+    if provider.name == "ollama":
+        message += " Is Ollama running? Start it with 'ollama serve'."
+    return message
 
 
 def _describe_by_status(status, provider, model=None):
