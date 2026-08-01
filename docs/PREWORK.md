@@ -79,7 +79,17 @@ uv run main.py
 
 Open the URL shown (e.g. `🚀 Running on: 127.0.0.1:8000`). Press `Ctrl+C` in the terminal to stop it.
 
-You'll see a message about a missing API key — **that's expected.** You'll receive one at the workshop.
+The terminal will warn about a missing `.env` file and API key, and the app will say the same in the browser — **that's expected.** You'll receive a key at the workshop. The app still starts, so you can click around beforehand.
+
+### When you get your key
+
+Two steps, and you can do them during the session:
+
+```bash
+cp .env.example .env
+```
+
+Then open `.env` and paste the key into `LLM_API_KEY`. That's the only line you need to change — the file already selects OpenRouter as the provider.
 
 ---
 
