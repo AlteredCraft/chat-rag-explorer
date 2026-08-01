@@ -868,7 +868,7 @@ def select_directory() -> Path:
             print(f"  [{len(corpus_dirs) + 1}] Enter a custom path")
             print()
 
-            choice = input("Ender a directory number: ").strip()
+            choice = input("Enter a directory number: ").strip()
 
             if not choice:
                 print("  Error: Selection is required. Try again.\n")
