@@ -1044,15 +1044,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (metadata.params) {
             if (metadata.params.temperature !== undefined) {
-                html += `<div class="details-meta-item"><span class="details-meta-label">Temperature:</span><span class="details-meta-value">${metadata.params.temperature}</span></div>`;
+                html += `<div class="details-meta-item"><span class="details-meta-label">Temperature:</span><span class="details-meta-value">${escapeHtml(metadata.params.temperature)}</span></div>`;
             }
             if (metadata.params.top_p !== undefined) {
-                html += `<div class="details-meta-item"><span class="details-meta-label">Top P:</span><span class="details-meta-value">${metadata.params.top_p}</span></div>`;
+                html += `<div class="details-meta-item"><span class="details-meta-label">Top P:</span><span class="details-meta-value">${escapeHtml(metadata.params.top_p)}</span></div>`;
             }
         }
 
         if (metadata.tokens) {
-            html += `<div class="details-meta-item"><span class="details-meta-label">Tokens:</span><span class="details-meta-value">${metadata.tokens.prompt_tokens || 0} + ${metadata.tokens.completion_tokens || 0} → ${metadata.tokens.total_tokens || 0}</span></div>`;
+            html += `<div class="details-meta-item"><span class="details-meta-label">Tokens:</span><span class="details-meta-value">${escapeHtml(metadata.tokens.prompt_tokens || 0)} + ${escapeHtml(metadata.tokens.completion_tokens || 0)} → ${escapeHtml(metadata.tokens.total_tokens || 0)}</span></div>`;
         }
 
         if (metadata.timing) {
@@ -1076,22 +1076,22 @@ document.addEventListener('DOMContentLoaded', () => {
             // Settings summary line
             const thresholdDisplay = distanceThreshold != null ? distanceThreshold : 'None';
             html += '<div class="details-rag-settings">';
-            html += `<span>Results requested: <strong>${nResults}</strong></span>`;
-            html += `<span>Distance threshold: <strong>${thresholdDisplay}</strong></span>`;
+            html += `<span>Results requested: <strong>${escapeHtml(nResults)}</strong></span>`;
+            html += `<span>Distance threshold: <strong>${escapeHtml(thresholdDisplay)}</strong></span>`;
             html += '</div>';
 
             // Callout when fewer results than requested
             if (docCount < nResults) {
                 if (docCount === 0) {
                     const thresholdNote = distanceThreshold != null
-                        ? ` (\u2264 ${distanceThreshold})`
+                        ? ` (\u2264 ${escapeHtml(distanceThreshold)})`
                         : '';
                     html += `<div class="details-rag-callout">No documents matched within the distance threshold${thresholdNote}.</div>`;
                 } else {
                     const thresholdNote = distanceThreshold != null
-                        ? ` (\u2264 ${distanceThreshold})`
+                        ? ` (\u2264 ${escapeHtml(distanceThreshold)})`
                         : '';
-                    html += `<div class="details-rag-callout">Only ${docCount} of ${nResults} requested documents were within the distance threshold${thresholdNote}.</div>`;
+                    html += `<div class="details-rag-callout">Only ${docCount} of ${escapeHtml(nResults)} requested documents were within the distance threshold${thresholdNote}.</div>`;
                 }
             }
 
@@ -1116,9 +1116,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Metadata fields (if any exist)
                 const metaFields = [];
-                if (meta.section_title) metaFields.push(`Section: ${meta.section_title}`);
-                if (meta.section_number) metaFields.push(`#${meta.section_number}`);
-                if (meta.author) metaFields.push(`Author: ${meta.author}`);
+                if (meta.section_title) metaFields.push(`Section: ${escapeHtml(meta.section_title)}`);
+                if (meta.section_number) metaFields.push(`#${escapeHtml(meta.section_number)}`);
+                if (meta.author) metaFields.push(`Author: ${escapeHtml(meta.author)}`);
                 const safeUrl = meta.url ? sanitizeUrl(meta.url) : '';
                 if (safeUrl) metaFields.push(`<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">Source</a>`);
 
@@ -1176,7 +1176,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 previousContext.forEach(msg => {
                     const roleClass = msg.role === 'user' ? 'user' : 'assistant';
                     html += `<div class="details-message ${roleClass}">`;
-                    html += `<div class="details-message-header">${msg.role}</div>`;
+                    html += `<div class="details-message-header">${escapeHtml(msg.role)}</div>`;
                     html += `<div class="details-message-content">${escapeHtml(msg.content)}</div>`;
                     html += '</div>';
                 });
@@ -1209,12 +1209,7 @@ document.addEventListener('DOMContentLoaded', () => {
         detailsModal.classList.add('visible');
     }
 
-    // Helper to escape HTML
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+    // escapeHtml() is shared with the settings page; see static/escape-html.js
 
     // Helper to sanitize URLs - only allow safe protocols
     function sanitizeUrl(url) {

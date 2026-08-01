@@ -247,8 +247,8 @@ document.addEventListener('DOMContentLoaded', () => {
             modelsListInfo.classList.add('info-box-active');
             modelsListTitle.textContent = 'Curated Model List Active';
             modelsListDescription.innerHTML = `
-                The available models are filtered by <code>${modelsListStatus.path}</code>
-                (${modelsListStatus.count} model${modelsListStatus.count !== 1 ? 's' : ''} configured).
+                The available models are filtered by <code>${escapeHtml(modelsListStatus.path)}</code>
+                (${escapeHtml(modelsListStatus.count)} model${modelsListStatus.count !== 1 ? 's' : ''} configured).
                 You can curate the model list by editing this file. See
                 <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a>
                 to browse available models.
@@ -260,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
             modelsListTitle.textContent = 'All Models Available';
             modelsListDescription.innerHTML = `
                 Showing all models from OpenRouter. To curate the list, create a
-                <code>${modelsListStatus.path}</code> file with one model ID per line.
+                <code>${escapeHtml(modelsListStatus.path)}</code> file with one model ID per line.
             `;
         }
 
@@ -375,26 +375,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const supportedParams = model.supported_parameters || [];
 
         modelDetails.innerHTML = `
-            ${description ? `<div class="detail-row description"><span class="detail-value">${description}</span></div>` : ''}
+            ${description ? `<div class="detail-row description"><span class="detail-value">${escapeHtml(description)}</span></div>` : ''}
             <div class="detail-row">
                 <span class="detail-label">Model ID:</span>
-                <span class="detail-value">${model.id}</span>
+                <span class="detail-value">${escapeHtml(model.id)}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Context Length:</span>
-                <span class="detail-value">${contextLength.toLocaleString()} tokens</span>
+                <span class="detail-value">${escapeHtml(contextLength.toLocaleString())} tokens</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Prompt Pricing:</span>
-                <span class="detail-value">${promptPrice}</span>
+                <span class="detail-value">${escapeHtml(promptPrice)}</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label">Completion Pricing:</span>
-                <span class="detail-value">${completionPrice}</span>
+                <span class="detail-value">${escapeHtml(completionPrice)}</span>
             </div>
-            ${inputModalities.length ? `<div class="detail-row"><span class="detail-label">Modality-in:</span><div class="tags">${inputModalities.map(m => `<span class="tag">${m}</span>`).join('')}</div></div>` : ''}
-            ${outputModalities.length ? `<div class="detail-row"><span class="detail-label">Modality-out:</span><div class="tags">${outputModalities.map(m => `<span class="tag">${m}</span>`).join('')}</div></div>` : ''}
-            ${supportedParams.length ? `<div class="detail-row"><span class="detail-label">Parameters:</span><div class="tags">${supportedParams.map(p => `<span class="tag">${p}</span>`).join('')}</div></div>` : ''}
+            ${inputModalities.length ? `<div class="detail-row"><span class="detail-label">Modality-in:</span><div class="tags">${inputModalities.map(m => `<span class="tag">${escapeHtml(m)}</span>`).join('')}</div></div>` : ''}
+            ${outputModalities.length ? `<div class="detail-row"><span class="detail-label">Modality-out:</span><div class="tags">${outputModalities.map(m => `<span class="tag">${escapeHtml(m)}</span>`).join('')}</div></div>` : ''}
+            ${supportedParams.length ? `<div class="detail-row"><span class="detail-label">Parameters:</span><div class="tags">${supportedParams.map(p => `<span class="tag">${escapeHtml(p)}</span>`).join('')}</div></div>` : ''}
         `;
         modelDetails.classList.add('visible');
     }
@@ -1118,7 +1118,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.configured) {
                 ragApiKeyStatus.innerHTML = `
                     <span class="status-ok">Configured</span>
-                    <code>${data.masked}</code>
+                    <code>${escapeHtml(data.masked)}</code>
                 `;
                 ragApiKeyStatus.classList.remove('error');
             } else {
@@ -1152,9 +1152,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data.valid) {
-                ragPathStatus.innerHTML = `<span class="status-ok">${data.message}</span>`;
+                ragPathStatus.innerHTML = `<span class="status-ok">${escapeHtml(data.message)}</span>`;
             } else {
-                ragPathStatus.innerHTML = `<span class="status-error">${data.message || data.error || 'Validation failed'}</span>`;
+                ragPathStatus.innerHTML = `<span class="status-error">${escapeHtml(data.message || data.error || 'Validation failed')}</span>`;
             }
         } catch (error) {
             ragPathStatus.innerHTML = '<span class="status-error">Validation failed</span>';
@@ -1211,7 +1211,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.success) {
                 let html = `<div class="test-success">
                     <strong>Connection successful!</strong>
-                    <p>${data.message}</p>`;
+                    <p>${escapeHtml(data.message)}</p>`;
                 if (data.collections && data.collections.length > 0) {
                     html += `<p>Found ${data.collections.length} collection(s)</p>`;
                 } else {
@@ -1234,7 +1234,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ragTestResult.innerHTML = `
                     <div class="test-error">
                         <strong>Connection failed</strong>
-                        <p>${data.message || data.error || 'Unexpected error'}</p>
+                        <p>${escapeHtml(data.message || data.error || 'Unexpected error')}</p>
                     </div>`;
                 ragCollectionSection.style.display = 'none';
             }
@@ -1242,7 +1242,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ragTestResult.innerHTML = `
                 <div class="test-error">
                     <strong>Test failed</strong>
-                    <p>${error.message}</p>
+                    <p>${escapeHtml(error.message)}</p>
                 </div>`;
             ragCollectionSection.style.display = 'none';
         } finally {
@@ -1535,7 +1535,7 @@ document.addEventListener('DOMContentLoaded', () => {
             SettingsLogger.info('Sample records fetched', { collection, count: result.count });
         } catch (error) {
             SettingsLogger.error('Failed to fetch sample records', { error: error.message });
-            ragSampleRecords.innerHTML = `<div class="sample-error">Error: ${error.message}</div>`;
+            ragSampleRecords.innerHTML = `<div class="sample-error">Error: ${escapeHtml(error.message)}</div>`;
             ragSampleCount.textContent = '';
             ragSampleSection.style.display = 'block';
         } finally {
@@ -1577,12 +1577,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
 
         ragSampleRecords.innerHTML = html;
-    }
-
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 
     // Global function for onclick handler
