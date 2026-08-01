@@ -60,17 +60,25 @@ OPENROUTER_API_KEY=sk-or-v1-your-key-here
 
 `.env` is gitignored, so your key will not be committed. Every other setting in that file is optional and already has a sensible default.
 
+`.env` is read once at startup, so if the app is already running, stop it with `Ctrl+C` and start it again before your key takes effect.
+
 **4. Start the app**
 
 ```bash
 uv run main.py
 ```
 
+Leave this running — it's your server. `Ctrl+C` in that terminal stops it.
+
 **5. Open it**
 
-Go to the URL printed in your terminal — [http://127.0.0.1:8000](http://127.0.0.1:8000) unless port 8000 was busy. Send a message and you should see the response stream in a token at a time.
+Go to the URL printed in your terminal — [http://127.0.0.1:8000](http://127.0.0.1:8000) unless port 8000 was busy. Type a message and send it; the reply should stream in a word at a time.
 
-> The app starts fine without an API key and tells you what's missing in the UI, so you can look around before step 3 if you'd rather.
+You don't need to visit Settings first. A model is already selected for you (see [Model Selection](#model-selection)), so a working key is the only thing standing between a fresh clone and a reply.
+
+To confirm the key is genuinely working, watch that first reply arrive. The model dropdown populating is *not* evidence — OpenRouter's catalog is public, so the picker fills in even with a bad key, and the failure only shows up when you actually send a message.
+
+> The app also starts fine *without* a key and says so in the UI, so you can look around before step 3 if you'd rather.
 
 ## Try RAG with the included sample data
 
@@ -130,7 +138,11 @@ Workshop attendees can also reach us at [info@alteredcraft.com](mailto:info@alte
 |---------|-----|
 | `uv: command not found` | Restart your terminal after installing uv so your `PATH` updates. |
 | Port already in use | The app tries 8000–8004 automatically. To pin one, set `SERVER_PORT` in `.env`. |
-| API key errors | Check `.env` exists (not just `.env.example`) and the key starts with `sk-or-v1-`. |
+| Models load, but sending a message fails | Expected if the key is bad — the catalog is public, so the picker fills regardless. Diagnose it as a key problem, not a model problem. |
+| `401` / `User not found` | The key reached OpenRouter and was rejected. It's invalid, revoked, or belongs to a deleted account — reissue at [openrouter.ai/keys](https://openrouter.ai/keys). A correctly *formatted* key can still be rejected. |
+| `402` / insufficient credits | The key is valid but the account is out of funds. [Add credit](https://openrouter.ai/settings/credits) or switch to a free model. |
+| Key set but still unauthorized | `.env` is read at startup only. Stop the app with `Ctrl+C` and start it again. |
+| Nothing in the model picker | Every ID in `.models_list` must exist upstream. Compare against [OpenRouter's catalog](https://openrouter.ai/models), or delete the file to show everything. |
 | First RAG query hangs | It's downloading the ~79 MB embedding model. Let it finish once. |
 | "No collections found" | Confirm the path is `data/chroma_db` and that the app has been started at least once — it creates that directory on first run. |
 
