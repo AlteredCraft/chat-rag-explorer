@@ -25,7 +25,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from flask import current_app
 
@@ -34,9 +34,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ChatHistoryEntry:
-    """Represents a single chat history log entry."""
+    """Represents a single chat history log entry.
 
-    schema_version: str = "1.0"
+    Schema versions:
+    - 1.0: original format (timing in seconds, original messages only)
+    - 1.1: request gains messages_original and rag; timing recorded in
+      milliseconds, matching the metadata payload sent to the client
+    """
+
+    schema_version: str = "1.1"
     request_id: str = ""
     response_id: str = ""
     timestamp: Dict[str, Any] = field(default_factory=dict)
@@ -72,71 +78,52 @@ class ChatHistoryService:
         return self._log_path
 
     def is_enabled(self) -> bool:
-        """Check if chat history logging is enabled."""
-        return current_app.config.get("CHAT_HISTORY_ENABLED", True)
+        """Check if chat history logging is enabled.
 
-    def log_interaction(
-        self,
-        request_id: str,
-        messages: List[Dict[str, str]],
-        model: str,
-        temperature: Optional[float],
-        top_p: Optional[float],
-        response_content: str,
-        status: str,
-        error: Optional[str],
-        total_seconds: float,
-        ttfc_seconds: Optional[float],
-        chunk_count: int,
-        tokens: Optional[Dict[str, int]] = None,
-    ) -> None:
+        Defaults to False when unset, matching the Config default.
+        """
+        return current_app.config.get("CHAT_HISTORY_ENABLED", False)
+
+    def log_interaction(self, entry_data: Dict[str, Any]) -> None:
         """Log a chat interaction to the history file (thread-safe).
 
+        Takes the same entry-data dict the chat route sends to the client as
+        its final metadata payload, so the history log and the client details
+        modal always agree.
+
         Args:
-            request_id: Unique identifier for the request
-            messages: Conversation messages sent to LLM
-            model: Model identifier used
-            temperature: Sampling temperature (optional)
-            top_p: Nucleus sampling parameter (optional)
-            response_content: Full accumulated response text
-            status: "success" or "error"
-            error: Error message if status is "error"
-            total_seconds: Total request duration
-            ttfc_seconds: Time to first chunk (optional)
-            chunk_count: Number of streaming chunks received
-            tokens: Token usage dict with prompt_tokens, completion_tokens, total_tokens
+            entry_data: Dict with request_id, model, params, messages (as sent
+                to the LLM), messages_original, response, status, error,
+                tokens, timing ({total_ms, ttfc_ms}), chunks, and rag
         """
         if not self.is_enabled():
             return
 
-        response_id = str(uuid.uuid4())
         now = datetime.now()
+        response_content = entry_data.get("response", "")
 
         entry = ChatHistoryEntry(
-            schema_version="1.0",
-            request_id=request_id,
-            response_id=response_id,
+            request_id=entry_data.get("request_id", ""),
+            response_id=str(uuid.uuid4()),
             timestamp={"iso": now.isoformat(), "unix": now.timestamp()},
             request={
-                "messages": messages,
+                "messages": entry_data.get("messages", []),
+                "messages_original": entry_data.get("messages_original", []),
                 "llm_params": {
-                    "model": model,
-                    "temperature": temperature,
-                    "top_p": top_p,
+                    "model": entry_data.get("model"),
+                    **entry_data.get("params", {}),
                 },
+                "rag": entry_data.get("rag"),
             },
             response={
                 "content": response_content,
-                "status": status,
-                "error": error,
+                "status": entry_data.get("status"),
+                "error": entry_data.get("error"),
             },
             metrics={
-                "timing": {
-                    "total_seconds": round(total_seconds, 3),
-                    "ttfc_seconds": round(ttfc_seconds, 3) if ttfc_seconds else None,
-                },
-                "tokens": tokens,
-                "chunks": chunk_count,
+                "timing": entry_data.get("timing", {}),
+                "tokens": entry_data.get("tokens"),
+                "chunks": entry_data.get("chunks"),
                 "content_length": len(response_content),
             },
         )

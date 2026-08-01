@@ -10,10 +10,10 @@ Features:
 - Protected default prompt that cannot be edited/deleted
 - CRUD operations for custom prompts
 """
-import os
-import re
 import logging
 from pathlib import Path
+
+import frontmatter
 
 logger = logging.getLogger(__name__)
 
@@ -57,50 +57,21 @@ class PromptService:
         # Go up from chat_rag_explorer to project root, then into prompts/
         return Path(__file__).parent.parent / "prompts"
 
-    def _parse_frontmatter(self, content):
-        """
-        Parse YAML frontmatter from markdown content.
-
-        Returns tuple of (metadata_dict, body_content).
-        Frontmatter is expected between --- delimiters at file start.
-        """
-        pattern = r'^---\s*\n(.*?)\n---\s*\n?(.*)$'
-        match = re.match(pattern, content, re.DOTALL)
-
-        if match:
-            frontmatter_raw = match.group(1)
-            body = match.group(2)
-
-            # Simple YAML parsing for title/description
-            metadata = {}
-            for line in frontmatter_raw.split('\n'):
-                line = line.strip()
-                if ':' in line:
-                    key, value = line.split(':', 1)
-                    key = key.strip()
-                    value = value.strip().strip('"\'')
-                    metadata[key] = value
-
-            return metadata, body.strip()
-
-        return {}, content.strip()
-
     def _load_prompt_file(self, file_path, request_id=None):
-        """Load and parse a single prompt file."""
+        """Load and parse a single prompt file (YAML frontmatter + body)."""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-
-            metadata, body = self._parse_frontmatter(content)
+                post = frontmatter.loads(f.read())
 
             # Generate ID from filename (without extension)
             prompt_id = file_path.stem
 
+            # `or` guards: a bare "title:" line parses as YAML null
             return {
                 'id': prompt_id,
-                'title': metadata.get('title', prompt_id),
-                'description': metadata.get('description', ''),
-                'content': body
+                'title': str(post.metadata.get('title') or prompt_id),
+                'description': str(post.metadata.get('description') or ''),
+                'content': post.content.strip()
             }
         except Exception as e:
             log_prefix = f"[{request_id}] " if request_id else ""
@@ -200,13 +171,13 @@ class PromptService:
             return None
 
     def _format_prompt_file(self, title, description, content):
-        """Format prompt data as markdown with YAML frontmatter."""
-        return f'''---
-title: "{title}"
-description: "{description}"
----
-{content}
-'''
+        """Format prompt data as markdown with YAML frontmatter.
+
+        Uses python-frontmatter so titles containing quotes or colons are
+        escaped correctly.
+        """
+        post = frontmatter.Post(content, title=title, description=description)
+        return frontmatter.dumps(post) + "\n"
 
     def is_protected(self, prompt_id):
         """Check if a prompt ID is protected."""

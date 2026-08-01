@@ -17,63 +17,66 @@ class TestDefaultPrompt:
         assert "sources" in DEFAULT_PROMPT['content'].lower()
 
 
-class TestParseFrontmatter:
-    """Tests for YAML frontmatter parsing."""
+class TestPromptFileParsing:
+    """Tests for loading and parsing prompt markdown files."""
 
-    def test_parse_valid_frontmatter(self):
-        """Parse complete frontmatter with title and description."""
+    def test_parse_valid_frontmatter(self, tmp_path):
+        """Parse a file with title and description frontmatter."""
         service = PromptService()
-        content = '''---
+        file_path = tmp_path / "my_prompt.md"
+        file_path.write_text('''---
 title: "Test Title"
 description: "Test Description"
 ---
-This is the body content.'''
+This is the body content.''', encoding="utf-8")
 
-        metadata, body = service._parse_frontmatter(content)
+        prompt = service._load_prompt_file(file_path)
 
-        assert metadata["title"] == "Test Title"
-        assert metadata["description"] == "Test Description"
-        assert body == "This is the body content."
+        assert prompt["id"] == "my_prompt"
+        assert prompt["title"] == "Test Title"
+        assert prompt["description"] == "Test Description"
+        assert prompt["content"] == "This is the body content."
 
-    def test_parse_frontmatter_no_quotes(self):
-        """Parse frontmatter values without quotes."""
+    def test_parse_no_frontmatter(self, tmp_path):
+        """A file without frontmatter falls back to filename as title."""
         service = PromptService()
-        content = '''---
-title: Simple Title
-description: Simple Description
+        file_path = tmp_path / "plain.md"
+        file_path.write_text("Just plain content without frontmatter.", encoding="utf-8")
+
+        prompt = service._load_prompt_file(file_path)
+
+        assert prompt["title"] == "plain"
+        assert prompt["description"] == ""
+        assert prompt["content"] == "Just plain content without frontmatter."
+
+    def test_empty_description_value_is_empty_string(self, tmp_path):
+        """A bare 'description:' line (YAML null) becomes an empty string."""
+        service = PromptService()
+        file_path = tmp_path / "p.md"
+        file_path.write_text('''---
+title: T
+description:
 ---
-Body here.'''
+Body.''', encoding="utf-8")
 
-        metadata, body = service._parse_frontmatter(content)
+        prompt = service._load_prompt_file(file_path)
 
-        assert metadata["title"] == "Simple Title"
-        assert metadata["description"] == "Simple Description"
+        assert prompt["description"] == ""
 
-    def test_parse_no_frontmatter(self):
-        """Content without frontmatter returns empty metadata."""
+    def test_save_and_load_round_trip_with_special_chars(self, tmp_path, monkeypatch):
+        """Titles with quotes and colons survive a save/load round trip."""
         service = PromptService()
-        content = "Just plain content without frontmatter."
+        monkeypatch.setattr(service, "_get_prompts_dir", lambda: tmp_path)
 
-        metadata, body = service._parse_frontmatter(content)
+        title = 'The "Ultimate" Guide: Part 1'
+        description = "Line with 'quotes' and: colons"
+        service.save_prompt("special", title, description, "Body text")
 
-        assert metadata == {}
-        assert body == "Just plain content without frontmatter."
+        prompt = service.get_prompt_by_id("special")
 
-    def test_parse_multiline_body(self):
-        """Body content preserves multiple lines."""
-        service = PromptService()
-        content = '''---
-title: "Multi"
----
-Line 1
-Line 2
-Line 3'''
-
-        metadata, body = service._parse_frontmatter(content)
-
-        assert "Line 1" in body
-        assert "Line 2" in body
-        assert "Line 3" in body
+        assert prompt["title"] == title
+        assert prompt["description"] == description
+        assert prompt["content"] == "Body text"
 
 
 class TestGetPrompts:

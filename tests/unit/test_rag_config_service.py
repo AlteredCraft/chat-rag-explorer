@@ -247,38 +247,35 @@ class TestValidateLocalPath:
 class TestGetApiKeyStatus:
     """Tests for get_api_key_status() method."""
 
-    def test_no_api_key(self, monkeypatch):
+    def test_no_api_key(self, app):
         """Returns not configured when no API key."""
         service = RagConfigService()
-        monkeypatch.setattr("chat_rag_explorer.rag_config_service.Config.CHROMADB_API_KEY", None)
+        app.config["CHROMADB_API_KEY"] = None
 
-        result = service.get_api_key_status()
+        with app.app_context():
+            result = service.get_api_key_status()
 
         assert result["configured"] is False
         assert result["masked"] is None
 
-    def test_api_key_configured(self, monkeypatch):
+    def test_api_key_configured(self, app):
         """Returns masked key when configured."""
         service = RagConfigService()
-        monkeypatch.setattr(
-            "chat_rag_explorer.rag_config_service.Config.CHROMADB_API_KEY",
-            "abcd1234efgh5678"
-        )
+        app.config["CHROMADB_API_KEY"] = "abcd1234efgh5678"
 
-        result = service.get_api_key_status()
+        with app.app_context():
+            result = service.get_api_key_status()
 
         assert result["configured"] is True
-        assert result["masked"] == "abcd...5678"
+        assert result["masked"] == "abcd1234...5678"
 
-    def test_short_api_key_masked(self, monkeypatch):
+    def test_short_api_key_masked(self, app):
         """Short API keys are fully masked."""
         service = RagConfigService()
-        monkeypatch.setattr(
-            "chat_rag_explorer.rag_config_service.Config.CHROMADB_API_KEY",
-            "short"
-        )
+        app.config["CHROMADB_API_KEY"] = "short"
 
-        result = service.get_api_key_status()
+        with app.app_context():
+            result = service.get_api_key_status()
 
         assert result["configured"] is True
         assert result["masked"] == "****"

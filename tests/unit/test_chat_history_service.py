@@ -9,6 +9,26 @@ import pytest
 from chat_rag_explorer.chat_history_service import ChatHistoryService, ChatHistoryEntry
 
 
+def make_entry_data(**overrides):
+    """Build a minimal chat entry-data dict, as assembled by the chat route."""
+    entry_data = {
+        "request_id": "req-123",
+        "model": "gpt-4",
+        "params": {"temperature": 0.7, "top_p": None},
+        "messages": [{"role": "user", "content": "Hello"}],
+        "messages_original": [{"role": "user", "content": "Hello"}],
+        "response": "Hi there!",
+        "status": "success",
+        "error": None,
+        "tokens": {"prompt_tokens": 5, "completion_tokens": 3, "total_tokens": 8},
+        "timing": {"total_ms": 1500.0, "ttfc_ms": 300.0},
+        "chunks": 10,
+        "rag": None,
+    }
+    entry_data.update(overrides)
+    return entry_data
+
+
 class TestChatHistoryEntry:
     """Tests for ChatHistoryEntry dataclass."""
 
@@ -28,7 +48,7 @@ class TestChatHistoryEntry:
 
         assert parsed["request_id"] == "test-123"
         assert parsed["response_id"] == "resp-456"
-        assert parsed["schema_version"] == "1.0"
+        assert parsed["schema_version"] == "1.1"
         assert parsed["response"]["content"] == "Hello!"
 
     def test_to_json_no_whitespace(self):
@@ -51,6 +71,14 @@ class TestChatHistoryService:
 
         assert service.is_enabled() is False
 
+    def test_is_enabled_false_when_config_key_missing(self, app):
+        """Falls back to disabled when CHAT_HISTORY_ENABLED is absent entirely."""
+        app.config.pop("CHAT_HISTORY_ENABLED", None)
+        service = ChatHistoryService()
+
+        with app.app_context():
+            assert service.is_enabled() is False
+
     def test_is_enabled_respects_config(self, app):
         """is_enabled respects CHAT_HISTORY_ENABLED config."""
         app.config["CHAT_HISTORY_ENABLED"] = False
@@ -67,20 +95,7 @@ class TestChatHistoryService:
         service = ChatHistoryService()
 
         with app.app_context():
-            service.log_interaction(
-                request_id="req-123",
-                messages=[{"role": "user", "content": "Hello"}],
-                model="gpt-4",
-                temperature=0.7,
-                top_p=None,
-                response_content="Hi there!",
-                status="success",
-                error=None,
-                total_seconds=1.5,
-                ttfc_seconds=0.3,
-                chunk_count=10,
-                tokens={"prompt_tokens": 5, "completion_tokens": 3, "total_tokens": 8}
-            )
+            service.log_interaction(make_entry_data())
 
         assert log_file.exists()
         content = log_file.read_text()
@@ -88,8 +103,10 @@ class TestChatHistoryService:
 
         assert entry["request_id"] == "req-123"
         assert entry["request"]["llm_params"]["model"] == "gpt-4"
+        assert entry["request"]["llm_params"]["temperature"] == 0.7
         assert entry["response"]["content"] == "Hi there!"
         assert entry["metrics"]["chunks"] == 10
+        assert entry["metrics"]["timing"]["total_ms"] == 1500.0
 
     def test_log_interaction_disabled(self, app, tmp_path):
         """No file written when logging is disabled."""
@@ -99,19 +116,7 @@ class TestChatHistoryService:
         service = ChatHistoryService()
 
         with app.app_context():
-            service.log_interaction(
-                request_id="req-123",
-                messages=[],
-                model="gpt-4",
-                temperature=None,
-                top_p=None,
-                response_content="response",
-                status="success",
-                error=None,
-                total_seconds=1.0,
-                ttfc_seconds=None,
-                chunk_count=1,
-            )
+            service.log_interaction(make_entry_data())
 
         assert not log_file.exists()
 
@@ -124,19 +129,7 @@ class TestChatHistoryService:
 
         with app.app_context():
             for i in range(3):
-                service.log_interaction(
-                    request_id=f"req-{i}",
-                    messages=[],
-                    model="gpt-4",
-                    temperature=None,
-                    top_p=None,
-                    response_content=f"response {i}",
-                    status="success",
-                    error=None,
-                    total_seconds=1.0,
-                    ttfc_seconds=None,
-                    chunk_count=1,
-                )
+                service.log_interaction(make_entry_data(request_id=f"req-{i}"))
 
         lines = log_file.read_text().strip().split("\n")
         assert len(lines) == 3
@@ -153,19 +146,7 @@ class TestChatHistoryService:
         service = ChatHistoryService()
 
         with app.app_context():
-            service.log_interaction(
-                request_id="req-123",
-                messages=[],
-                model="gpt-4",
-                temperature=None,
-                top_p=None,
-                response_content="test",
-                status="success",
-                error=None,
-                total_seconds=1.0,
-                ttfc_seconds=None,
-                chunk_count=1,
-            )
+            service.log_interaction(make_entry_data())
 
         assert log_file.exists()
 
@@ -177,19 +158,13 @@ class TestChatHistoryService:
         service = ChatHistoryService()
 
         with app.app_context():
-            service.log_interaction(
-                request_id="req-123",
-                messages=[],
-                model="gpt-4",
-                temperature=None,
-                top_p=None,
-                response_content="",
+            service.log_interaction(make_entry_data(
+                response="",
                 status="error",
                 error="Connection timeout",
-                total_seconds=30.0,
-                ttfc_seconds=None,
-                chunk_count=0,
-            )
+                tokens=None,
+                chunks=0,
+            ))
 
         entry = json.loads(log_file.read_text().strip())
         assert entry["response"]["status"] == "error"
@@ -203,26 +178,43 @@ class TestChatHistoryService:
         service = ChatHistoryService()
 
         with app.app_context():
-            service.log_interaction(
-                request_id="req-123",
-                messages=[],
-                model="gpt-4",
-                temperature=None,
-                top_p=None,
-                response_content="response",
-                status="success",
-                error=None,
-                total_seconds=1.0,
-                ttfc_seconds=0.5,
-                chunk_count=10,
+            service.log_interaction(make_entry_data(
                 tokens={
                     "prompt_tokens": 100,
                     "completion_tokens": 50,
-                    "total_tokens": 150
+                    "total_tokens": 150,
                 }
-            )
+            ))
 
         entry = json.loads(log_file.read_text().strip())
         assert entry["metrics"]["tokens"]["prompt_tokens"] == 100
         assert entry["metrics"]["tokens"]["completion_tokens"] == 50
         assert entry["metrics"]["tokens"]["total_tokens"] == 150
+
+    def test_log_interaction_records_rag_and_augmented_messages(self, app, tmp_path):
+        """RAG metadata and the augmented messages sent to the LLM are recorded."""
+        log_file = tmp_path / "history.jsonl"
+        app.config["CHAT_HISTORY_PATH"] = str(log_file)
+        app.config["CHAT_HISTORY_ENABLED"] = True
+        service = ChatHistoryService()
+
+        rag = {
+            "enabled": True,
+            "documents_retrieved": 1,
+            "collection": "my_collection",
+            "documents": ["Doc 1"],
+        }
+        augmented = [{"role": "user", "content": "<knowledge_base_context>...</knowledge_base_context>"}]
+        original = [{"role": "user", "content": "What is X?"}]
+
+        with app.app_context():
+            service.log_interaction(make_entry_data(
+                messages=augmented,
+                messages_original=original,
+                rag=rag,
+            ))
+
+        entry = json.loads(log_file.read_text().strip())
+        assert entry["request"]["rag"]["collection"] == "my_collection"
+        assert entry["request"]["messages"] == augmented
+        assert entry["request"]["messages_original"] == original

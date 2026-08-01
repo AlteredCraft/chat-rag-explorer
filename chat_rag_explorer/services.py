@@ -1,41 +1,27 @@
 """
-LLM chat service using OpenRouter API.
+LLM chat service.
 
 Provides:
-- ChatService: Handles streaming chat completions via OpenAI-compatible API
-- Model listing from the OpenRouter API
+- ChatService: Streaming chat completions via the OpenAI SDK pointed at
+  the active provider's OpenAI-compatible endpoint (see providers.py)
+- Model listing via the provider abstraction, filtered by .models_list
 - Request correlation via request_id for log tracing
 - Token usage tracking and performance metrics
-
-The service uses the OpenAI SDK configured to point at OpenRouter,
-making it compatible with any OpenAI-compatible backend.
 """
 import json
 import logging
 import time
 from pathlib import Path
-import requests
 from openai import OpenAI
 from flask import current_app
+
+from chat_rag_explorer.providers import get_active_provider, list_models
+from chat_rag_explorer.utils import mask_api_key
 
 logger = logging.getLogger(__name__)
 
 
 # --- Pure helper functions (easily testable without mocks) ---
-
-def mask_api_key(api_key):
-    """Mask an API key for safe logging.
-
-    Args:
-        api_key: The API key string to mask
-
-    Returns:
-        Masked string like "sk-abc12...xyz9" or "[MISSING]" if invalid
-    """
-    if api_key and len(api_key) > 12:
-        return f"{api_key[:8]}...{api_key[-4:]}"
-    return "[MISSING]"
-
 
 def build_chat_params(model, messages, temperature=None, top_p=None):
     """Build API parameters for chat completion request.
@@ -82,18 +68,6 @@ def extract_usage_data(chunk, fallback_model):
     return None
 
 
-def format_metadata_marker(usage_data):
-    """Format usage data as a metadata marker string.
-
-    Args:
-        usage_data: Dict containing token usage information
-
-    Returns:
-        String like "__METADATA__:{...json...}"
-    """
-    return f"__METADATA__:{json.dumps(usage_data)}"
-
-
 def sort_models_by_name(models):
     """Sort model list by name (or id as fallback).
 
@@ -106,6 +80,11 @@ def sort_models_by_name(models):
     return sorted(models, key=lambda m: m.get("name", m.get("id", "")))
 
 
+def _models_list_path():
+    """Path to the optional .models_list file in the project root."""
+    return Path(current_app.root_path).parent / ".models_list"
+
+
 def load_models_list():
     """Load model IDs from .models_list file if it exists.
 
@@ -115,7 +94,7 @@ def load_models_list():
     Returns:
         Set of model IDs to include, or None if file doesn't exist or is empty
     """
-    models_list_path = Path(current_app.root_path).parent / ".models_list"
+    models_list_path = _models_list_path()
     if not models_list_path.exists():
         return None
 
@@ -139,21 +118,10 @@ def get_models_list_status():
             - count: int - Number of model IDs in the file (0 if doesn't exist)
             - path: str - Relative path to the file
     """
-    models_list_path = Path(current_app.root_path).parent / ".models_list"
-    exists = models_list_path.exists()
-    count = 0
-
-    if exists:
-        # UTF-8 for the same reason as load_models_list above.
-        with open(models_list_path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    count += 1
-
+    models = load_models_list()
     return {
-        "exists": exists,
-        "count": count,
+        "exists": _models_list_path().exists(),
+        "count": len(models) if models else 0,
         "path": ".models_list"
     }
 
@@ -164,35 +132,42 @@ class ChatService:
         logger.debug("ChatService instance created")
 
     def is_configured(self):
-        """Check if the OpenRouter API key is configured.
+        """Check if the active provider's API key is configured.
 
         Returns:
             bool: True if API key is set and non-empty, False otherwise
         """
-        api_key = current_app.config.get("OPENROUTER_API_KEY")
-        return bool(api_key and len(api_key) > 0)
+        return bool(get_active_provider().api_key)
 
     def get_client(self):
         if not self.client:
-            base_url = current_app.config["OPENROUTER_BASE_URL"]
-            api_key = current_app.config["OPENROUTER_API_KEY"]
+            provider = get_active_provider()
 
             # Log initialization with masked API key
-            logger.info(f"Initializing OpenAI client - Base URL: {base_url}, API Key: {mask_api_key(api_key)}")
+            logger.info(
+                f"Initializing OpenAI client - Provider: {provider.name}, "
+                f"Base URL: {provider.base_url}, API Key: {mask_api_key(provider.api_key)}"
+            )
 
-            if not api_key:
-                logger.error("OPENROUTER_API_KEY is not configured")
-                raise ValueError("OPENROUTER_API_KEY is not configured")
+            if not provider.api_key:
+                logger.error(f"API key for provider '{provider.name}' is not configured")
+                raise ValueError(f"API key for provider '{provider.name}' is not configured")
 
             self.client = OpenAI(
-                base_url=base_url,
-                api_key=api_key,
+                base_url=provider.base_url,
+                api_key=provider.api_key,
             )
             logger.debug("OpenAI client initialized successfully")
         return self.client
 
     def chat_stream(self, messages, model=None, temperature=None, top_p=None, request_id=None):
-        """Stream chat completions from the LLM.
+        """Stream chat completion events from the LLM.
+
+        Yields typed (kind, payload) tuples so callers can distinguish
+        content from metadata without sniffing string prefixes:
+        - ("content", str): a chunk of assistant response text
+        - ("usage", dict): token usage data, usually once near stream end
+        - ("error", str): error message; the stream ends after this
 
         Args:
             messages: Conversation messages to send
@@ -234,7 +209,7 @@ class ChatService:
                         f"[{req_id}] Token usage - Prompt: {usage_data['prompt_tokens']}, "
                         f"Completion: {usage_data['completion_tokens']}, Total: {usage_data['total_tokens']}"
                     )
-                    yield format_metadata_marker(usage_data)
+                    yield ("usage", usage_data)
 
                 if len(chunk.choices) > 0:
                     content = chunk.choices[0].delta.content
@@ -242,7 +217,7 @@ class ChatService:
                         chunk_count += 1
                         total_content_length += len(content)
                         full_response.append(content)
-                        yield content
+                        yield ("content", content)
 
                 # Log progress every 50 chunks (reduced verbosity)
                 if chunk_count > 0 and chunk_count % 50 == 0:
@@ -258,58 +233,33 @@ class ChatService:
         except Exception as e:
             elapsed = time.time() - stream_start_time
             logger.error(f"[{req_id}] Stream error after {elapsed:.3f}s: {type(e).__name__}: {str(e)}", exc_info=True)
-            yield f"Error: {str(e)}"
+            yield ("error", str(e))
 
 
     def get_models(self, request_id=None):
-        """Fetch available models from OpenRouter API.
+        """Fetch available models from the active provider.
+
+        Applies the optional .models_list filter and sorts by name.
 
         Args:
             request_id: Optional request ID for log correlation
         """
         req_id = request_id or "no-id"
-        logger.info(f"[{req_id}] Fetching models from OpenRouter API")
+        provider = get_active_provider()
+        logger.info(f"[{req_id}] Fetching models from provider '{provider.name}'")
 
-        start_time = time.time()
+        models = list_models(provider, req_id)
 
-        try:
-            url = f"{current_app.config['OPENROUTER_BASE_URL']}/models"
-            headers = {
-                "Authorization": f"Bearer {current_app.config['OPENROUTER_API_KEY']}"
-            }
+        # Filter by .models_list if it exists
+        models_list = load_models_list()
+        if models_list:
+            models = [m for m in models if m.get("id") in models_list]
+            logger.info(f"[{req_id}] Filtered to {len(models)} models from .models_list")
 
-            logger.debug(f"[{req_id}] GET {url}")
-            response = requests.get(url, headers=headers, timeout=30)
+        models = sort_models_by_name(models)
 
-            elapsed = time.time() - start_time
-            logger.debug(f"[{req_id}] OpenRouter API response: {response.status_code} ({elapsed:.3f}s)")
-
-            response.raise_for_status()
-
-            data = response.json()
-            models = data.get("data", [])
-
-            # Filter by .models_list if it exists
-            models_list = load_models_list()
-            if models_list:
-                models = [m for m in models if m.get("id") in models_list]
-                logger.info(f"[{req_id}] Filtered to {len(models)} models from .models_list")
-
-            models = sort_models_by_name(models)
-
-            logger.info(f"[{req_id}] Successfully fetched {len(models)} models ({elapsed:.3f}s)")
-            return models
-
-        except requests.RequestException as e:
-            elapsed = time.time() - start_time
-            # Log more details about the HTTP error
-            status_code = getattr(e.response, 'status_code', 'N/A') if hasattr(e, 'response') else 'N/A'
-            logger.error(
-                f"[{req_id}] Failed to fetch models - Status: {status_code}, "
-                f"Error: {type(e).__name__}: {str(e)} ({elapsed:.3f}s)",
-                exc_info=True
-            )
-            raise
+        logger.info(f"[{req_id}] Successfully fetched {len(models)} models")
+        return models
 
 
 chat_service = ChatService()

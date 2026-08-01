@@ -77,14 +77,16 @@ Do not edit pyproject.toml directly for dependencies.
 - `config.py` - Environment configuration loaded from `.env`
 
 **Backend Services (Singleton Pattern)**
-- `services.py` - `chat_service`: OpenRouter LLM streaming via OpenAI SDK
+- `services.py` - `chat_service`: LLM streaming via OpenAI SDK pointed at the active provider
+- `providers.py` - Provider seam: connection details + model listing per OpenAI-compatible provider (OpenRouter today; built to add Ollama local/cloud without touching streaming code)
 - `rag_config_service.py` - `rag_config_service`: ChromaDB connection management (local/server/cloud modes)
 - `prompt_service.py` - `prompt_service`: System prompt CRUD operations
 - `chat_history_service.py` - `chat_history_service`: Conversation logging to JSONL
 
 **API Design**
 - All endpoints use request_id for log correlation
-- Streaming responses use SSE with `__METADATA__:` prefix for token usage
+- `/api/chat` streams plain-text chunks; a final `__METADATA__:` JSON payload carries token usage and request details
+- Internally, `chat_service.chat_stream` yields typed `(kind, payload)` events ("content" / "usage" / "error"); the route serializes them at the HTTP boundary
 - Routes defined in `routes.py` as single Blueprint (`main_bp`)
 
 **Frontend**

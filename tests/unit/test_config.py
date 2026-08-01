@@ -33,34 +33,13 @@ def read_models_list_ids():
     return ids
 
 
-def read_frontend_default_model(js_filename):
-    """
-    Extract the DEFAULT_MODEL constant from a frontend JavaScript file.
-
-    Args:
-        js_filename: Name of the file in chat_rag_explorer/static/
-
-    Returns:
-        The model ID string, or None if the constant was not found
-    """
-    # Read as UTF-8 explicitly. Windows defaults to the locale encoding (cp1252),
-    # which cannot decode the non-ASCII characters these files contain.
-    js_path = PROJECT_ROOT / "chat_rag_explorer" / "static" / js_filename
-    match = re.search(
-        r"""const DEFAULT_MODEL = ['"]([^'"]+)['"]""",
-        js_path.read_text(encoding="utf-8"),
-    )
-    return match.group(1) if match else None
-
-
 class TestDefaultModelConsistency:
     """
-    The default model must agree across config.py, the frontend, and .models_list.
+    The default model must be selectable in the model picker.
 
-    These three drifted apart once already: config.py was updated while both
-    frontend files kept a stale model ID that was no longer in .models_list. The
-    browser sends a model on every chat request, so the frontend constant is what
-    a first-time user actually gets - the backend default never fires for them.
+    The frontend fetches the default from /api/status (single source of
+    truth in config.py), so the only rule left to enforce is that the
+    default appears in .models_list when that filter file exists.
     """
 
     def test_default_model_is_in_models_list(self):
@@ -76,17 +55,21 @@ class TestDefaultModelConsistency:
             f".models_list, so it will not appear in the model picker"
         )
 
-    @pytest.mark.parametrize("js_filename", ["script.js", "settings.js"])
-    def test_frontend_default_matches_backend(self, js_filename):
-        """Each frontend DEFAULT_MODEL must match the one in config.py."""
-        from config import Config
+    def test_frontend_has_no_hardcoded_default_model(self):
+        """The frontend must fetch the default from /api/status, not hardcode it.
 
-        frontend_default = read_frontend_default_model(js_filename)
-
-        assert frontend_default == Config.DEFAULT_MODEL, (
-            f"{js_filename} defaults to {frontend_default!r} but config.py uses "
-            f"{Config.DEFAULT_MODEL!r}"
-        )
+        The old hardcoded constants drifted from config.py once already;
+        this guards against the pattern being reintroduced.
+        """
+        for js_filename in ["script.js", "settings.js"]:
+            js_path = PROJECT_ROOT / "chat_rag_explorer" / "static" / js_filename
+            # UTF-8 explicitly: Windows' locale default (cp1252) cannot decode
+            # the non-ASCII characters these files contain.
+            content = js_path.read_text(encoding="utf-8")
+            assert not re.search(r"const DEFAULT_MODEL\s*=", content), (
+                f"{js_filename} hardcodes DEFAULT_MODEL; it must use the "
+                f"default_model value served by /api/status instead"
+            )
 
 
 class TestConfig:
@@ -156,10 +139,33 @@ class TestConfig:
 
             assert config.Config.CHAT_HISTORY_ENABLED is False
 
-    def test_openrouter_base_url_constant(self):
-        """OPENROUTER_BASE_URL is hardcoded constant."""
+    def test_openrouter_base_url_default(self):
+        """OPENROUTER_BASE_URL defaults to the OpenRouter endpoint."""
         import importlib
         import config
         importlib.reload(config)
 
         assert config.Config.OPENROUTER_BASE_URL == "https://openrouter.ai/api/v1"
+
+    def test_openrouter_base_url_env_override(self):
+        """Base URL can point at any OpenAI-compatible endpoint (e.g. Ollama)."""
+        import importlib
+        import config
+        try:
+            with patch.dict(os.environ, {"OPENROUTER_BASE_URL": "http://localhost:11434/v1"}, clear=True):
+                importlib.reload(config)
+                assert config.Config.OPENROUTER_BASE_URL == "http://localhost:11434/v1"
+        finally:
+            # Reload with the real environment so later tests see real values
+            importlib.reload(config)
+
+    def test_default_model_env_override(self):
+        """DEFAULT_MODEL reads from environment."""
+        import importlib
+        import config
+        try:
+            with patch.dict(os.environ, {"DEFAULT_MODEL": "custom/model"}, clear=True):
+                importlib.reload(config)
+                assert config.Config.DEFAULT_MODEL == "custom/model"
+        finally:
+            importlib.reload(config)

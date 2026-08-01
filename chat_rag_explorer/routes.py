@@ -13,14 +13,18 @@ API Endpoints:
 - /api/prompts/<id> : GET/PUT/DELETE - Manage individual prompts
 - /api/rag/* : RAG configuration and ChromaDB management
 
-All API endpoints use request_id for log correlation and include
-timing metrics for observability.
+Cross-cutting concerns are handled once for the whole blueprint:
+- before_request attaches a request ID and start time to `g` for
+  log correlation and timing metrics
+- errorhandler(Exception) logs unexpected failures and returns a
+  JSON 500 response
 """
 import json
 import logging
 import time
 import uuid
-from flask import Blueprint, current_app, render_template, request, Response, stream_with_context, jsonify
+from flask import Blueprint, current_app, g, render_template, request, Response, stream_with_context, jsonify
+from werkzeug.exceptions import HTTPException
 from chat_rag_explorer.services import chat_service, get_models_list_status
 from chat_rag_explorer.prompt_service import prompt_service
 from chat_rag_explorer.rag_config_service import rag_config_service
@@ -30,9 +34,37 @@ main_bp = Blueprint("main", __name__)
 logger = logging.getLogger(__name__)
 
 
-def generate_request_id():
-    """Generate a short unique request ID for log correlation."""
-    return str(uuid.uuid4())[:8]
+@main_bp.before_request
+def start_request_tracking():
+    """Attach a request ID and start time to the request context (g).
+
+    Every request gets a full UUID (used for chat history correlation)
+    and a short 8-char prefix (used in application logs).
+    """
+    g.request_id_full = str(uuid.uuid4())
+    g.request_id = g.request_id_full[:8]
+    g.start_time = time.time()
+
+
+@main_bp.errorhandler(Exception)
+def handle_unexpected_error(e):
+    """Log unexpected errors and return a JSON 500 response.
+
+    HTTP errors (404, 405, ...) pass through so Flask renders them normally.
+    """
+    if isinstance(e, HTTPException):
+        return e
+    logger.error(
+        f"[{g.request_id}] {request.method} {request.path} - "
+        f"Failed after {request_elapsed():.3f}s: {e}",
+        exc_info=True,
+    )
+    return jsonify({"error": str(e)}), 500
+
+
+def request_elapsed():
+    """Seconds since the current request started."""
+    return time.time() - g.start_time
 
 
 def escape_xml_attr(value):
@@ -96,23 +128,86 @@ def build_augmented_message(user_message, documents, metadatas=None):
     return "\n".join(context_parts)
 
 
+def apply_rag_context(messages, rag_enabled, request_id):
+    """
+    Retrieve RAG context and augment the latest user message if enabled.
+
+    Args:
+        messages: Conversation messages from the client
+        rag_enabled: Whether the client requested RAG retrieval
+        request_id: Request ID for log correlation
+
+    Returns:
+        Tuple of (messages_for_llm, rag_result). messages_for_llm is the
+        original list unless context was retrieved, in which case the last
+        user message is replaced with an augmented version. rag_result is
+        the raw query_collection result, or None if no query was made.
+    """
+    if not rag_enabled:
+        return messages, None
+
+    user_messages = [m for m in messages if m.get("role") == "user"]
+    if not user_messages:
+        return messages, None
+
+    latest_user_msg = user_messages[-1]["content"]
+    rag_result = rag_config_service.query_collection(
+        query_text=latest_user_msg,
+        request_id=request_id,
+    )
+
+    if not rag_result.get("success"):
+        logger.warning(f"[{request_id}] RAG query failed: {rag_result.get('message')}")
+        return messages, rag_result
+
+    if not rag_result.get("documents"):
+        logger.debug(f"[{request_id}] RAG query returned no documents")
+        return messages, rag_result
+
+    logger.info(
+        f"[{request_id}] RAG retrieved {len(rag_result['documents'])} documents "
+        f"from '{rag_result.get('collection')}'"
+    )
+
+    augmented_content = build_augmented_message(
+        latest_user_msg,
+        rag_result["documents"],
+        rag_result.get("metadatas"),
+    )
+    return messages[:-1] + [{"role": "user", "content": augmented_content}], rag_result
+
+
+def build_rag_metadata(rag_result):
+    """
+    Build the RAG metadata dict for the client details modal and history log.
+
+    Args:
+        rag_result: Result dict from query_collection, or None if no query ran
+
+    Returns:
+        Metadata dict with retrieval details, or None when rag_result is None
+    """
+    if not rag_result:
+        return None
+
+    documents = rag_result.get("documents") or []
+    return {
+        "enabled": True,
+        "documents_retrieved": len(documents),
+        "collection": rag_result.get("collection"),
+        "documents": documents,
+        "metadatas": rag_result.get("metadatas") or [],
+        "distances": rag_result.get("distances") or [],
+        "ids": rag_result.get("ids") or [],
+        "n_results": rag_result.get("n_results"),
+        "distance_threshold": rag_result.get("distance_threshold"),
+    }
+
+
 @main_bp.route("/")
 def index():
     logger.debug("Serving index page")
     return render_template("index.html")
-
-
-@main_bp.route("/api/status")
-def get_status():
-    """GET - Return application status including API key configuration."""
-    request_id = generate_request_id()
-    logger.debug(f"[{request_id}] GET /api/status - Checking app status")
-
-    api_key_configured = chat_service.is_configured()
-
-    return jsonify({
-        "api_key_configured": api_key_configured
-    })
 
 
 @main_bp.route("/settings")
@@ -127,176 +222,138 @@ def about():
     return render_template("about.html")
 
 
+@main_bp.route("/api/status")
+def get_status():
+    """GET - Return application status: API key state and default model.
+
+    The default model is served here so the frontend has a single source
+    of truth instead of hardcoding a copy of config.py's DEFAULT_MODEL.
+    """
+    logger.debug(f"[{g.request_id}] GET /api/status - Checking app status")
+
+    return jsonify({
+        "api_key_configured": chat_service.is_configured(),
+        "default_model": current_app.config.get("DEFAULT_MODEL"),
+    })
+
+
 @main_bp.route("/api/models")
 def get_models():
-    request_id = generate_request_id()
-    start_time = time.time()
-    logger.info(f"[{request_id}] GET /api/models - Fetching available models")
+    logger.info(f"[{g.request_id}] GET /api/models - Fetching available models")
 
-    try:
-        models = chat_service.get_models(request_id)
-        models_list_status = get_models_list_status()
-        elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] GET /api/models - Returned {len(models)} models ({elapsed:.3f}s)")
-        return jsonify({
-            "data": models,
-            "models_list": models_list_status
-        })
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] GET /api/models - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
+    models = chat_service.get_models(g.request_id)
+    models_list_status = get_models_list_status()
+
+    logger.info(f"[{g.request_id}] GET /api/models - Returned {len(models)} models ({request_elapsed():.3f}s)")
+    return jsonify({
+        "data": models,
+        "models_list": models_list_status
+    })
 
 
 @main_bp.route("/api/prompts")
 def get_prompts():
-    request_id = generate_request_id()
-    start_time = time.time()
-    logger.info(f"[{request_id}] GET /api/prompts - Fetching available prompts")
+    logger.info(f"[{g.request_id}] GET /api/prompts - Fetching available prompts")
 
-    try:
-        prompts = prompt_service.get_prompts(request_id)
-        elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] GET /api/prompts - Returned {len(prompts)} prompts ({elapsed:.3f}s)")
-        return jsonify({"data": prompts})
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] GET /api/prompts - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
+    prompts = prompt_service.get_prompts(g.request_id)
+
+    logger.info(f"[{g.request_id}] GET /api/prompts - Returned {len(prompts)} prompts ({request_elapsed():.3f}s)")
+    return jsonify({"data": prompts})
 
 
 @main_bp.route("/api/prompts/<prompt_id>")
 def get_prompt(prompt_id):
-    request_id = generate_request_id()
-    start_time = time.time()
-    logger.info(f"[{request_id}] GET /api/prompts/{prompt_id} - Fetching prompt content")
+    logger.info(f"[{g.request_id}] GET /api/prompts/{prompt_id} - Fetching prompt content")
 
-    try:
-        prompt = prompt_service.get_prompt_by_id(prompt_id, request_id)
-        if prompt is None:
-            logger.warning(f"[{request_id}] GET /api/prompts/{prompt_id} - Not found")
-            return jsonify({"error": "Prompt not found"}), 404
-        elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] GET /api/prompts/{prompt_id} - Success ({elapsed:.3f}s)")
-        return jsonify({"data": prompt})
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] GET /api/prompts/{prompt_id} - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
+    prompt = prompt_service.get_prompt_by_id(prompt_id, g.request_id)
+    if prompt is None:
+        logger.warning(f"[{g.request_id}] GET /api/prompts/{prompt_id} - Not found")
+        return jsonify({"error": "Prompt not found"}), 404
+
+    logger.info(f"[{g.request_id}] GET /api/prompts/{prompt_id} - Success ({request_elapsed():.3f}s)")
+    return jsonify({"data": prompt})
 
 
 @main_bp.route("/api/prompts", methods=["POST"])
 def create_prompt():
-    request_id = generate_request_id()
-    start_time = time.time()
-
     data = request.json
     prompt_id = data.get("id", "").strip()
     title = data.get("title", "").strip()
     description = data.get("description", "").strip()
     content = data.get("content", "").strip()
 
-    logger.info(f"[{request_id}] POST /api/prompts - Creating prompt: {prompt_id}")
+    logger.info(f"[{g.request_id}] POST /api/prompts - Creating prompt: {prompt_id}")
 
     if not prompt_id:
         return jsonify({"error": "Prompt ID is required"}), 400
     if not title:
         return jsonify({"error": "Title is required"}), 400
 
-    # Check if prompt ID is protected
     if prompt_service.is_protected(prompt_id):
         return jsonify({"error": "Cannot use this prompt ID"}), 403
 
-    # Check if prompt already exists
-    existing = prompt_service.get_prompt_by_id(prompt_id, request_id)
-    if existing:
+    if prompt_service.get_prompt_by_id(prompt_id, g.request_id):
         return jsonify({"error": "A prompt with this ID already exists"}), 409
 
-    try:
-        prompt = prompt_service.save_prompt(prompt_id, title, description, content, request_id)
-        if prompt is None:
-            return jsonify({"error": "Failed to create prompt"}), 500
-        elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] POST /api/prompts - Created ({elapsed:.3f}s)")
-        return jsonify({"data": prompt}), 201
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] POST /api/prompts - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
+    prompt = prompt_service.save_prompt(prompt_id, title, description, content, g.request_id)
+    if prompt is None:
+        return jsonify({"error": "Failed to create prompt"}), 500
+
+    logger.info(f"[{g.request_id}] POST /api/prompts - Created ({request_elapsed():.3f}s)")
+    return jsonify({"data": prompt}), 201
 
 
 @main_bp.route("/api/prompts/<prompt_id>", methods=["PUT"])
 def update_prompt(prompt_id):
-    request_id = generate_request_id()
-    start_time = time.time()
-
     data = request.json
     title = data.get("title", "").strip()
     description = data.get("description", "").strip()
     content = data.get("content", "").strip()
 
-    logger.info(f"[{request_id}] PUT /api/prompts/{prompt_id} - Updating prompt")
+    logger.info(f"[{g.request_id}] PUT /api/prompts/{prompt_id} - Updating prompt")
 
     if not title:
         return jsonify({"error": "Title is required"}), 400
 
-    # Check if prompt is protected
     if prompt_service.is_protected(prompt_id):
         return jsonify({"error": "Cannot edit protected prompt"}), 403
 
-    # Check if prompt exists
-    existing = prompt_service.get_prompt_by_id(prompt_id, request_id)
-    if not existing:
+    if not prompt_service.get_prompt_by_id(prompt_id, g.request_id):
         return jsonify({"error": "Prompt not found"}), 404
 
-    try:
-        prompt = prompt_service.save_prompt(prompt_id, title, description, content, request_id)
-        if prompt is None:
-            return jsonify({"error": "Failed to update prompt"}), 500
-        elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] PUT /api/prompts/{prompt_id} - Updated ({elapsed:.3f}s)")
-        return jsonify({"data": prompt})
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] PUT /api/prompts/{prompt_id} - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
+    prompt = prompt_service.save_prompt(prompt_id, title, description, content, g.request_id)
+    if prompt is None:
+        return jsonify({"error": "Failed to update prompt"}), 500
+
+    logger.info(f"[{g.request_id}] PUT /api/prompts/{prompt_id} - Updated ({request_elapsed():.3f}s)")
+    return jsonify({"data": prompt})
 
 
 @main_bp.route("/api/prompts/<prompt_id>", methods=["DELETE"])
 def delete_prompt(prompt_id):
-    request_id = generate_request_id()
-    start_time = time.time()
+    logger.info(f"[{g.request_id}] DELETE /api/prompts/{prompt_id} - Deleting prompt")
 
-    logger.info(f"[{request_id}] DELETE /api/prompts/{prompt_id} - Deleting prompt")
-
-    # Check if prompt is protected
     if prompt_service.is_protected(prompt_id):
         return jsonify({"error": "Cannot delete protected prompt"}), 403
 
-    # Check if prompt exists
-    existing = prompt_service.get_prompt_by_id(prompt_id, request_id)
-    if not existing:
+    if not prompt_service.get_prompt_by_id(prompt_id, g.request_id):
         return jsonify({"error": "Prompt not found"}), 404
 
-    try:
-        success = prompt_service.delete_prompt(prompt_id, request_id)
-        if not success:
-            return jsonify({"error": "Failed to delete prompt"}), 500
-        elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] DELETE /api/prompts/{prompt_id} - Deleted ({elapsed:.3f}s)")
-        return jsonify({"success": True})
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] DELETE /api/prompts/{prompt_id} - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
+    success = prompt_service.delete_prompt(prompt_id, g.request_id)
+    if not success:
+        return jsonify({"error": "Failed to delete prompt"}), 500
+
+    logger.info(f"[{g.request_id}] DELETE /api/prompts/{prompt_id} - Deleted ({request_elapsed():.3f}s)")
+    return jsonify({"success": True})
 
 
 @main_bp.route("/api/chat", methods=["POST"])
 def chat():
-    # Generate full UUID for chat history, short version for app logs
-    full_request_id = str(uuid.uuid4())
-    request_id = full_request_id[:8]
-    start_time = time.time()
+    # Capture request-context values as locals so the streaming generator
+    # below doesn't depend on the request context staying alive
+    request_id = g.request_id
+    full_request_id = g.request_id_full
+    start_time = g.start_time
 
     data = request.json
     messages = data.get("messages", [])
@@ -322,52 +379,10 @@ def chat():
     if not model:
         logger.warning(f"[{request_id}] POST /api/chat - No model specified, will use default")
 
-    # RAG context retrieval
-    rag_context = None
-    rag_result = None
-    messages_for_llm = messages
-
-    if rag_enabled:
-        # Find the last user message to use as query
-        user_messages = [m for m in messages if m.get("role") == "user"]
-        if user_messages:
-            latest_user_msg = user_messages[-1]["content"]
-
-            # Query ChromaDB for relevant context
-            rag_result = rag_config_service.query_collection(
-                query_text=latest_user_msg,
-                request_id=request_id
-            )
-
-            if rag_result.get("success") and rag_result.get("documents"):
-                rag_context = rag_result
-                logger.info(
-                    f"[{request_id}] RAG retrieved {len(rag_result['documents'])} documents "
-                    f"from '{rag_result.get('collection')}'"
-                )
-
-                # Build augmented message with context
-                augmented_content = build_augmented_message(
-                    latest_user_msg,
-                    rag_result["documents"],
-                    rag_result.get("metadatas")
-                )
-
-                # Create modified messages array with augmented last user message
-                messages_for_llm = messages[:-1] + [
-                    {"role": "user", "content": augmented_content}
-                ]
-            else:
-                # RAG query returned no results or failed
-                if not rag_result.get("success"):
-                    logger.warning(
-                        f"[{request_id}] RAG query failed: {rag_result.get('message')}"
-                    )
-                else:
-                    logger.debug(f"[{request_id}] RAG query returned no documents")
+    messages_for_llm, rag_result = apply_rag_context(messages, rag_enabled, request_id)
 
     def stream_with_logging():
-        """Wrapper to add logging and chat history around the stream."""
+        """Stream LLM chunks, then log the interaction and append metadata."""
         accumulated_content = []
         chunk_count = 0
         ttfc_time = None
@@ -375,165 +390,80 @@ def chat():
         error_message = None
         status = "success"
         resolved_model = model
+        stream_error = None
 
         try:
-            for chunk in chat_service.chat_stream(messages_for_llm, model, temperature, top_p, request_id):
-                # Track time to first content chunk
-                if ttfc_time is None and not chunk.startswith("__METADATA__") and not chunk.startswith("Error:"):
-                    ttfc_time = time.time()
+            for kind, payload in chat_service.chat_stream(messages_for_llm, model, temperature, top_p, request_id):
+                # Usage data is kept for the final metadata payload, not streamed
+                if kind == "usage":
+                    token_usage = {
+                        "prompt_tokens": payload.get("prompt_tokens"),
+                        "completion_tokens": payload.get("completion_tokens"),
+                        "total_tokens": payload.get("total_tokens"),
+                    }
+                    if payload.get("model"):
+                        resolved_model = payload["model"]
+                    continue
 
-                # Extract metadata (token usage) - don't yield to client
-                if chunk.startswith("__METADATA__:"):
-                    metadata_json = chunk[len("__METADATA__:"):]
-                    try:
-                        metadata = json.loads(metadata_json)
-                        token_usage = {
-                            "prompt_tokens": metadata.get("prompt_tokens"),
-                            "completion_tokens": metadata.get("completion_tokens"),
-                            "total_tokens": metadata.get("total_tokens"),
-                        }
-                        # Update model if returned in metadata
-                        if metadata.get("model"):
-                            resolved_model = metadata.get("model")
-                    except json.JSONDecodeError:
-                        pass
-                    continue  # Don't yield metadata to client
-
-                # Track errors
-                if chunk.startswith("Error:"):
+                if kind == "error":
                     status = "error"
-                    error_message = chunk
-                else:
-                    accumulated_content.append(chunk)
+                    error_message = payload
+                    chunk_count += 1
+                    yield f"Error: {payload}"
+                    continue
 
+                # Content chunk
+                if ttfc_time is None:
+                    ttfc_time = time.time()
+                accumulated_content.append(payload)
                 chunk_count += 1
-                yield chunk
-
-            elapsed = time.time() - start_time
-            ttfc_seconds = (ttfc_time - start_time) if ttfc_time else None
-
-            logger.info(f"[{request_id}] POST /api/chat - Stream completed ({elapsed:.3f}s, {chunk_count} chunks)")
-
-            # Build the entry data (used for both logging and client metadata)
-            final_model = resolved_model or current_app.config.get("DEFAULT_MODEL", "unknown")
-            response_content = "".join(accumulated_content)
-
-            # Build RAG metadata if context was used
-            rag_metadata = None
-            if rag_enabled and rag_result:
-                rag_metadata = {
-                    "enabled": True,
-                    "documents_retrieved": len(rag_context["documents"]) if rag_context else 0,
-                    "collection": rag_result.get("collection"),
-                    "documents": rag_context.get("documents", []) if rag_context else [],
-                    "metadatas": rag_context.get("metadatas", []) if rag_context else [],
-                    "distances": rag_context.get("distances", []) if rag_context else [],
-                    "ids": rag_context.get("ids", []) if rag_context else [],
-                    "n_results": rag_result.get("n_results"),
-                    "distance_threshold": rag_result.get("distance_threshold"),
-                }
-
-            entry_data = {
-                "request_id": full_request_id,
-                "model": final_model,
-                "params": {
-                    "temperature": temperature,
-                    "top_p": top_p,
-                },
-                "messages": messages_for_llm,  # Send augmented messages for transparency
-                "messages_original": messages,  # Also include original for reference
-                "response": response_content,
-                "status": status,
-                "error": error_message,
-                "tokens": token_usage,
-                "timing": {
-                    "total_ms": round(elapsed * 1000, 2),
-                    "ttfc_ms": round(ttfc_seconds * 1000, 2) if ttfc_seconds else None,
-                },
-                "chunks": chunk_count,
-                "rag": rag_metadata,
-            }
-
-            # Log to chat history
-            chat_history_service.log_interaction(
-                request_id=full_request_id,
-                messages=messages,
-                model=final_model,
-                temperature=temperature,
-                top_p=top_p,
-                response_content=response_content,
-                status=status,
-                error=error_message,
-                total_seconds=elapsed,
-                ttfc_seconds=ttfc_seconds,
-                chunk_count=chunk_count,
-                tokens=token_usage,
-            )
-
-            # Send metadata to client for details modal
-            yield f"__METADATA__:{json.dumps(entry_data)}"
+                yield payload
 
         except Exception as e:
-            elapsed = time.time() - start_time
-            ttfc_seconds = (ttfc_time - start_time) if ttfc_time else None
-            logger.error(f"[{request_id}] POST /api/chat - Stream error after {elapsed:.3f}s: {str(e)}", exc_info=True)
-
-            # Build the entry data for error case
-            final_model = resolved_model or model or current_app.config.get("DEFAULT_MODEL", "unknown")
-            response_content = "".join(accumulated_content)
-
-            # Build RAG metadata for error case
-            rag_metadata_err = None
-            if rag_enabled and rag_result:
-                rag_metadata_err = {
-                    "enabled": True,
-                    "documents_retrieved": len(rag_context["documents"]) if rag_context else 0,
-                    "collection": rag_result.get("collection"),
-                    "documents": rag_context.get("documents", []) if rag_context else [],
-                    "metadatas": rag_context.get("metadatas", []) if rag_context else [],
-                    "distances": rag_context.get("distances", []) if rag_context else [],
-                    "ids": rag_context.get("ids", []) if rag_context else [],
-                    "n_results": rag_result.get("n_results"),
-                    "distance_threshold": rag_result.get("distance_threshold"),
-                }
-
-            entry_data = {
-                "request_id": full_request_id,
-                "model": final_model,
-                "params": {
-                    "temperature": temperature,
-                    "top_p": top_p,
-                },
-                "messages": messages_for_llm,
-                "messages_original": messages,
-                "response": response_content,
-                "status": "error",
-                "error": str(e),
-                "tokens": token_usage,
-                "timing": {
-                    "total_ms": round(elapsed * 1000, 2),
-                    "ttfc_ms": round(ttfc_seconds * 1000, 2) if ttfc_seconds else None,
-                },
-                "chunks": chunk_count,
-                "rag": rag_metadata_err,
-            }
-
-            # Log failed interaction to chat history
-            chat_history_service.log_interaction(
-                request_id=full_request_id,
-                messages=messages,
-                model=final_model,
-                temperature=temperature,
-                top_p=top_p,
-                response_content=response_content,
-                status="error",
-                error=str(e),
-                total_seconds=elapsed,
-                ttfc_seconds=ttfc_seconds,
-                chunk_count=chunk_count,
-                tokens=token_usage,
+            stream_error = e
+            status = "error"
+            error_message = str(e)
+            logger.error(
+                f"[{request_id}] POST /api/chat - Stream error after "
+                f"{time.time() - start_time:.3f}s: {str(e)}", exc_info=True
             )
-            raise
+
+        # Single finalize path for success, in-band errors, and exceptions:
+        # assemble the metadata payload once, log it, then either re-raise
+        # (exception case) or append it to the stream for the client.
+        elapsed = time.time() - start_time
+        ttfc_seconds = (ttfc_time - start_time) if ttfc_time else None
+
+        entry_data = {
+            "request_id": full_request_id,
+            "model": resolved_model or current_app.config.get("DEFAULT_MODEL", "unknown"),
+            "params": {
+                "temperature": temperature,
+                "top_p": top_p,
+            },
+            "messages": messages_for_llm,  # Send augmented messages for transparency
+            "messages_original": messages,  # Also include original for reference
+            "response": "".join(accumulated_content),
+            "status": status,
+            "error": error_message,
+            "tokens": token_usage,
+            "timing": {
+                "total_ms": round(elapsed * 1000, 2),
+                "ttfc_ms": round(ttfc_seconds * 1000, 2) if ttfc_seconds else None,
+            },
+            "chunks": chunk_count,
+            "rag": build_rag_metadata(rag_result),
+        }
+
+        chat_history_service.log_interaction(entry_data)
+
+        if stream_error:
+            raise stream_error
+
+        logger.info(f"[{request_id}] POST /api/chat - Stream completed ({elapsed:.3f}s, {chunk_count} chunks)")
+
+        # Send metadata to client for details modal
+        yield f"__METADATA__:{json.dumps(entry_data)}"
 
     return Response(
         stream_with_context(stream_with_logging()),
@@ -547,141 +477,86 @@ def chat():
 @main_bp.route("/api/rag/config")
 def get_rag_config():
     """GET - Retrieve current RAG configuration."""
-    request_id = generate_request_id()
-    start_time = time.time()
-    logger.info(f"[{request_id}] GET /api/rag/config - Fetching RAG configuration")
+    logger.info(f"[{g.request_id}] GET /api/rag/config - Fetching RAG configuration")
 
-    try:
-        config = rag_config_service.get_config(request_id)
-        elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] GET /api/rag/config - Success ({elapsed:.3f}s)")
-        return jsonify({"data": config})
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] GET /api/rag/config - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
+    config = rag_config_service.get_config(g.request_id)
+
+    logger.info(f"[{g.request_id}] GET /api/rag/config - Success ({request_elapsed():.3f}s)")
+    return jsonify({"data": config})
 
 
 @main_bp.route("/api/rag/config", methods=["POST"])
 def save_rag_config():
     """POST - Save RAG configuration."""
-    request_id = generate_request_id()
-    start_time = time.time()
-
     data = request.json
-    logger.info(f"[{request_id}] POST /api/rag/config - Saving RAG configuration (mode: {data.get('mode')})")
+    logger.info(f"[{g.request_id}] POST /api/rag/config - Saving RAG configuration (mode: {data.get('mode')})")
 
-    try:
-        result = rag_config_service.save_config(data, request_id)
-        elapsed = time.time() - start_time
+    result = rag_config_service.save_config(data, g.request_id)
+    if 'error' in result:
+        logger.warning(f"[{g.request_id}] POST /api/rag/config - Validation failed: {result['error']}")
+        return jsonify(result), 400
 
-        if 'error' in result:
-            logger.warning(f"[{request_id}] POST /api/rag/config - Validation failed: {result['error']}")
-            return jsonify(result), 400
-
-        logger.info(f"[{request_id}] POST /api/rag/config - Saved ({elapsed:.3f}s)")
-        return jsonify(result)
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] POST /api/rag/config - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
+    logger.info(f"[{g.request_id}] POST /api/rag/config - Saved ({request_elapsed():.3f}s)")
+    return jsonify(result)
 
 
 @main_bp.route("/api/rag/validate-path", methods=["POST"])
 def validate_rag_path():
     """POST - Validate a local ChromaDB path."""
-    request_id = generate_request_id()
-    start_time = time.time()
+    path = request.json.get("path", "")
+    logger.info(f"[{g.request_id}] POST /api/rag/validate-path - Validating: {path}")
 
-    data = request.json
-    path = data.get("path", "")
-    logger.info(f"[{request_id}] POST /api/rag/validate-path - Validating: {path}")
+    result = rag_config_service.validate_local_path(path, g.request_id)
 
-    try:
-        result = rag_config_service.validate_local_path(path, request_id)
-        elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] POST /api/rag/validate-path - Valid: {result['valid']} ({elapsed:.3f}s)")
-        return jsonify(result)
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] POST /api/rag/validate-path - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"valid": False, "message": str(e)}), 500
+    logger.info(f"[{g.request_id}] POST /api/rag/validate-path - Valid: {result['valid']} ({request_elapsed():.3f}s)")
+    return jsonify(result)
 
 
 @main_bp.route("/api/rag/test-connection", methods=["POST"])
 def test_rag_connection():
     """POST - Test ChromaDB connection with provided config."""
-    request_id = generate_request_id()
-    start_time = time.time()
-
     data = request.json
-    mode = data.get("mode", "local")
-    logger.info(f"[{request_id}] POST /api/rag/test-connection - Testing connection (mode: {mode})")
+    logger.info(f"[{g.request_id}] POST /api/rag/test-connection - Testing connection (mode: {data.get('mode', 'local')})")
 
-    try:
-        result = rag_config_service.test_connection(data, request_id)
-        elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] POST /api/rag/test-connection - Success: {result['success']} ({elapsed:.3f}s)")
-        return jsonify(result)
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] POST /api/rag/test-connection - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
+    result = rag_config_service.test_connection(data, g.request_id)
+
+    logger.info(f"[{g.request_id}] POST /api/rag/test-connection - Success: {result['success']} ({request_elapsed():.3f}s)")
+    return jsonify(result)
 
 
 @main_bp.route("/api/rag/api-key-status")
 def get_rag_api_key_status():
     """GET - Check if CHROMADB_API_KEY is configured."""
-    request_id = generate_request_id()
-    logger.debug(f"[{request_id}] GET /api/rag/api-key-status - Checking API key status")
+    logger.debug(f"[{g.request_id}] GET /api/rag/api-key-status - Checking API key status")
 
-    try:
-        result = rag_config_service.get_api_key_status(request_id)
-        return jsonify(result)
-    except Exception as e:
-        logger.error(f"[{request_id}] GET /api/rag/api-key-status - Failed: {str(e)}", exc_info=True)
-        return jsonify({"configured": False, "masked": None}), 500
+    return jsonify(rag_config_service.get_api_key_status(g.request_id))
 
 
 @main_bp.route("/api/rag/discover-databases")
 def discover_rag_databases():
     """GET - Discover ChromaDB databases in ./data/ directory."""
-    request_id = generate_request_id()
-    start_time = time.time()
-    logger.info(f"[{request_id}] GET /api/rag/discover-databases - Discovering databases")
+    logger.info(f"[{g.request_id}] GET /api/rag/discover-databases - Discovering databases")
 
-    try:
-        result = rag_config_service.discover_databases(request_id)
-        elapsed = time.time() - start_time
-        logger.info(f"[{request_id}] GET /api/rag/discover-databases - Found {len(result.get('databases', []))} database(s) ({elapsed:.3f}s)")
-        return jsonify(result)
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] GET /api/rag/discover-databases - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"success": False, "databases": [], "error": str(e)}), 500
+    result = rag_config_service.discover_databases(g.request_id)
+
+    logger.info(
+        f"[{g.request_id}] GET /api/rag/discover-databases - "
+        f"Found {len(result.get('databases', []))} database(s) ({request_elapsed():.3f}s)"
+    )
+    return jsonify(result)
 
 
 @main_bp.route("/api/rag/sample", methods=["POST"])
 def get_rag_sample():
     """POST - Fetch sample records from a ChromaDB collection."""
-    request_id = generate_request_id()
-    start_time = time.time()
-
     data = request.json
     collection = data.get("collection", "")
-    logger.info(f"[{request_id}] POST /api/rag/sample - Fetching samples from '{collection}'")
+    logger.info(f"[{g.request_id}] POST /api/rag/sample - Fetching samples from '{collection}'")
 
-    try:
-        result = rag_config_service.get_sample_records(data, collection, limit=5, request_id=request_id)
-        elapsed = time.time() - start_time
+    result = rag_config_service.get_sample_records(data, collection, limit=5, request_id=g.request_id)
+    if not result.get('success'):
+        logger.warning(f"[{g.request_id}] POST /api/rag/sample - Failed: {result.get('message')}")
+        return jsonify(result), 400
 
-        if not result.get('success'):
-            logger.warning(f"[{request_id}] POST /api/rag/sample - Failed: {result.get('message')}")
-            return jsonify(result), 400
-
-        logger.info(f"[{request_id}] POST /api/rag/sample - Returned {result.get('count')} records ({elapsed:.3f}s)")
-        return jsonify(result)
-    except Exception as e:
-        elapsed = time.time() - start_time
-        logger.error(f"[{request_id}] POST /api/rag/sample - Failed after {elapsed:.3f}s: {str(e)}", exc_info=True)
-        return jsonify({"success": False, "message": str(e)}), 500
+    logger.info(f"[{g.request_id}] POST /api/rag/sample - Returned {result.get('count')} records ({request_elapsed():.3f}s)")
+    return jsonify(result)

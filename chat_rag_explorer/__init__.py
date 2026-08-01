@@ -13,6 +13,8 @@ import os
 from flask import Flask
 from config import Config
 
+from chat_rag_explorer.utils import mask_api_key
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,7 +54,7 @@ def _log_startup_config(app):
 
     # Log environment/config (mask sensitive values)
     api_key = app.config.get("OPENROUTER_API_KEY", "")
-    masked_key = f"{api_key[:8]}...{api_key[-4:]}" if api_key and len(api_key) > 12 else "[NOT SET]"
+    masked_key = mask_api_key(api_key)
 
     logger.info(f"Configuration:")
     logger.info(f"  - OpenRouter Base URL: {app.config.get('OPENROUTER_BASE_URL', 'NOT SET')}")

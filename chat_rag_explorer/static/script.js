@@ -91,7 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const bannerDismiss = document.getElementById('banner-dismiss');
 
     /**
-     * Check if the OpenRouter API key is configured and update UI accordingly.
+     * Check if the LLM API key is configured and update UI accordingly.
+     * Also captures the server's default model (single source of truth).
      */
     async function checkApiKeyStatus() {
         try {
@@ -99,7 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             apiKeyConfigured = data.api_key_configured;
-            AppLogger.info('API key status checked', { configured: apiKeyConfigured });
+            defaultModel = data.default_model || '';
+            AppLogger.info('API key status checked', { configured: apiKeyConfigured, defaultModel });
+
+            // Refresh the model metric now that the default is known
+            // (first-time visitors have nothing saved in localStorage yet)
+            document.getElementById('metric-model').textContent = getCurrentModel();
 
             updateApiKeyUI();
         } catch (error) {
@@ -195,8 +201,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const STORAGE_KEY = 'chat-rag-selected-model';
-    // Keep in sync with DEFAULT_MODEL in config.py (enforced by tests/unit/test_config.py)
-    const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
+    // Populated from /api/status (DEFAULT_MODEL in config.py is the single
+    // source of truth). Until the fetch resolves, an empty model is sent and
+    // the backend applies its default.
+    let defaultModel = '';
 
     // Prompt selection constants
     const PROMPT_STORAGE_KEY = 'chat-rag-selected-prompt';
@@ -357,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Get model from localStorage or use default
     function getCurrentModel() {
-        const model = localStorage.getItem(STORAGE_KEY) || DEFAULT_MODEL;
+        const model = localStorage.getItem(STORAGE_KEY) || defaultModel;
         return model;
     }
 
@@ -421,7 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('storage', (e) => {
         if (e.key === STORAGE_KEY) {
             AppLogger.info('Model changed via storage event', { newModel: e.newValue });
-            document.getElementById('metric-model').textContent = e.newValue || DEFAULT_MODEL;
+            document.getElementById('metric-model').textContent = e.newValue || defaultModel;
             updateParameterControls();
         }
         if (e.key === PROMPT_STORAGE_KEY) {

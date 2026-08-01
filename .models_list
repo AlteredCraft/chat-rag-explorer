@@ -6,8 +6,8 @@
 # Delete this file to offer every OpenRouter model. Note that many of the
 # hundreds of models available are not appropriate for chat.
 #
-# DEFAULT_MODEL (config.py, script.js, settings.js) must be listed here,
-# or it cannot be selected. See "Model Selection" in the README.
+# DEFAULT_MODEL (config.py) must be listed here, or it cannot be
+# selected. See "Model Selection" in the README.
 
 # OpenAI
 openai/gpt-5.6-luna

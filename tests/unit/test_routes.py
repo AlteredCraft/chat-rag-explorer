@@ -4,28 +4,18 @@ Unit tests for routes.py.
 Tests route-level logic: validation, error handling, response formatting.
 Service calls are mocked to isolate HTTP layer behavior.
 """
+import json
 import pytest
 from unittest.mock import patch, MagicMock
-from chat_rag_explorer.routes import generate_request_id, build_augmented_message, escape_xml_attr
+from chat_rag_explorer.routes import build_augmented_message, escape_xml_attr
 
 
-class TestGenerateRequestId:
-    """Tests for generate_request_id function."""
-
-    def test_returns_8_chars(self):
-        """Request ID is 8 characters."""
-        request_id = generate_request_id()
-        assert len(request_id) == 8
-
-    def test_returns_string(self):
-        """Request ID is a string."""
-        request_id = generate_request_id()
-        assert isinstance(request_id, str)
-
-    def test_unique_ids(self):
-        """Multiple calls return unique IDs."""
-        ids = {generate_request_id() for _ in range(100)}
-        assert len(ids) == 100
+def parse_chat_stream(response):
+    """Split a streamed chat response body into (content, metadata dict)."""
+    body = response.get_data(as_text=True)
+    marker = "__METADATA__:"
+    idx = body.rindex(marker)
+    return body[:idx], json.loads(body[idx + len(marker):])
 
 
 class TestEscapeXmlAttr:
@@ -209,6 +199,16 @@ class TestGetStatus:
         assert response.status_code == 200
         data = response.get_json()
         assert data["api_key_configured"] is True
+
+    @patch("chat_rag_explorer.routes.chat_service")
+    def test_returns_default_model(self, mock_service, client, app):
+        """Serves the configured default model so the frontend needn't hardcode it."""
+        mock_service.is_configured.return_value = True
+        app.config["DEFAULT_MODEL"] = "provider/some-model"
+
+        response = client.get("/api/status")
+
+        assert response.get_json()["default_model"] == "provider/some-model"
 
     @patch("chat_rag_explorer.routes.chat_service")
     def test_returns_api_key_configured_false(self, mock_service, client):
@@ -464,8 +464,7 @@ class TestChatWithRag:
             assert "<knowledge_base_context>" in last_msg["content"]
             assert "Context document 1" in last_msg["content"]
             assert "<original_user_message>" in last_msg["content"]
-            yield "Response"
-            yield "__METADATA__:{}"
+            yield ("content", "Response")
 
         mock_chat.chat_stream.side_effect = mock_stream
 
@@ -497,8 +496,7 @@ class TestChatWithRag:
         def mock_stream(messages, *args, **kwargs):
             nonlocal captured_message
             captured_message = messages[-1]["content"]
-            yield "Response"
-            yield "__METADATA__:{}"
+            yield ("content", "Response")
 
         mock_chat.chat_stream.side_effect = mock_stream
 
@@ -523,8 +521,7 @@ class TestChatWithRag:
             # Verify the message is unchanged (no RAG context)
             last_msg = messages[-1]
             assert last_msg["content"] == "What is X?"
-            yield "Response"
-            yield "__METADATA__:{}"
+            yield ("content", "Response")
 
         mock_chat.chat_stream.side_effect = mock_stream
 
@@ -552,8 +549,7 @@ class TestChatWithRag:
             # Verify the message is unchanged (no RAG context)
             last_msg = messages[-1]
             assert last_msg["content"] == "What is X?"
-            yield "Response"
-            yield "__METADATA__:{}"
+            yield ("content", "Response")
 
         mock_chat.chat_stream.side_effect = mock_stream
 
@@ -582,9 +578,7 @@ class TestChatWithRag:
         collected_data = []
 
         def mock_stream(messages, *args, **kwargs):
-            yield "Response"
-            # The route builds entry_data with RAG metadata
-            yield "__METADATA__:{}"
+            yield ("content", "Response")
 
         mock_chat.chat_stream.side_effect = mock_stream
 
@@ -595,3 +589,124 @@ class TestChatWithRag:
         })
 
         assert response.status_code == 200
+
+
+class TestChatMetadataPayload:
+    """Tests for the final __METADATA__ payload contract and history logging."""
+
+    @patch("chat_rag_explorer.routes.chat_history_service")
+    @patch("chat_rag_explorer.routes.chat_service")
+    def test_metadata_payload_contract(self, mock_chat, mock_history, client):
+        """The final metadata payload carries the fields the client relies on."""
+        usage = {
+            "prompt_tokens": 5,
+            "completion_tokens": 3,
+            "total_tokens": 8,
+            "model": "provider/actual-model",
+        }
+
+        def mock_stream(messages, *args, **kwargs):
+            yield ("content", "Hello ")
+            yield ("content", "world")
+            yield ("usage", usage)
+
+        mock_chat.chat_stream.side_effect = mock_stream
+
+        response = client.post("/api/chat", json={
+            "messages": [{"role": "user", "content": "Hi"}],
+            "model": "test-model",
+            "temperature": 0.5,
+        })
+
+        assert response.status_code == 200
+        content, metadata = parse_chat_stream(response)
+
+        assert content == "Hello world"
+        assert metadata["model"] == "provider/actual-model"
+        assert metadata["params"] == {"temperature": 0.5, "top_p": None}
+        assert metadata["response"] == "Hello world"
+        assert metadata["status"] == "success"
+        assert metadata["error"] is None
+        assert metadata["tokens"]["total_tokens"] == 8
+        assert metadata["timing"]["total_ms"] >= 0
+        assert metadata["chunks"] == 2
+        assert metadata["rag"] is None
+        assert len(metadata["request_id"]) == 36  # full UUID
+
+    @patch("chat_rag_explorer.routes.chat_history_service")
+    @patch("chat_rag_explorer.routes.chat_service")
+    def test_history_receives_same_entry_data(self, mock_chat, mock_history, client):
+        """log_interaction receives the same dict sent to the client."""
+        def mock_stream(messages, *args, **kwargs):
+            yield ("content", "Response")
+
+        mock_chat.chat_stream.side_effect = mock_stream
+
+        response = client.post("/api/chat", json={
+            "messages": [{"role": "user", "content": "Hi"}],
+            "model": "test-model",
+        })
+
+        _, metadata = parse_chat_stream(response)
+
+        mock_history.log_interaction.assert_called_once()
+        logged_entry = mock_history.log_interaction.call_args.args[0]
+        assert logged_entry == metadata
+
+    @patch("chat_rag_explorer.routes.chat_history_service")
+    @patch("chat_rag_explorer.routes.chat_service")
+    @patch("chat_rag_explorer.routes.rag_config_service")
+    def test_rag_metadata_and_messages_in_payload(self, mock_rag, mock_chat, mock_history, client):
+        """RAG retrieval details and augmented messages appear in the payload."""
+        mock_rag.query_collection.return_value = {
+            "success": True,
+            "documents": ["Doc 1"],
+            "metadatas": [{"title": "T"}],
+            "distances": [0.5],
+            "ids": ["id1"],
+            "collection": "my_collection",
+            "n_results": 5,
+            "distance_threshold": None,
+        }
+
+        def mock_stream(messages, *args, **kwargs):
+            yield ("content", "Response")
+
+        mock_chat.chat_stream.side_effect = mock_stream
+
+        response = client.post("/api/chat", json={
+            "messages": [{"role": "user", "content": "What is X?"}],
+            "model": "test-model",
+            "rag_enabled": True,
+        })
+
+        _, metadata = parse_chat_stream(response)
+
+        assert metadata["rag"]["enabled"] is True
+        assert metadata["rag"]["documents_retrieved"] == 1
+        assert metadata["rag"]["collection"] == "my_collection"
+        assert metadata["rag"]["documents"] == ["Doc 1"]
+        # Augmented message goes to the LLM; original is preserved separately
+        assert "<knowledge_base_context>" in metadata["messages"][-1]["content"]
+        assert metadata["messages_original"][-1]["content"] == "What is X?"
+
+    @patch("chat_rag_explorer.routes.chat_history_service")
+    @patch("chat_rag_explorer.routes.chat_service")
+    def test_in_band_error_reported_in_metadata(self, mock_chat, mock_history, client):
+        """An error surfaced by the chat service is reflected in the payload."""
+        def mock_stream(messages, *args, **kwargs):
+            yield ("error", "upstream unavailable")
+
+        mock_chat.chat_stream.side_effect = mock_stream
+
+        response = client.post("/api/chat", json={
+            "messages": [{"role": "user", "content": "Hi"}],
+            "model": "test-model",
+        })
+
+        assert response.status_code == 200
+        _, metadata = parse_chat_stream(response)
+
+        assert metadata["status"] == "error"
+        assert "upstream unavailable" in metadata["error"]
+        assert metadata["response"] == ""

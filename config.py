@@ -19,13 +19,15 @@ load_dotenv()
 
 class Config:
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+    # Any OpenAI-compatible endpoint works here (e.g. a local Ollama at
+    # http://localhost:11434/v1); OpenRouter is the default.
+    OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
-    # Model used when a request specifies none. Must also be listed in
-    # .models_list and mirrored in static/script.js and static/settings.js,
-    # since the browser sends a model ID on every chat request.
-    # tests/unit/test_config.py enforces both rules.
-    DEFAULT_MODEL = "deepseek/deepseek-v4-flash"
+    # Model used when a request specifies none. The frontend fetches this
+    # from /api/status, so this is the single source of truth. It must also
+    # be listed in .models_list to be selectable in the picker
+    # (tests/unit/test_config.py enforces that rule).
+    DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "deepseek/deepseek-v4-flash")
 
     # ChromaDB Configuration
     CHROMADB_API_KEY = os.getenv("CHROMADB_API_KEY")

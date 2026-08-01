@@ -52,6 +52,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/status');
             const data = await response.json();
 
+            // Capture the server's default model (single source of truth)
+            defaultModel = data.default_model || '';
+
             if (!data.api_key_configured && apiKeyBanner) {
                 apiKeyBanner.style.display = 'block';
                 SettingsLogger.info('API key not configured, showing banner');
@@ -114,8 +117,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const STORAGE_KEY = 'chat-rag-selected-model';
     const FILTER_STORAGE_KEY = 'chat-rag-free-filter';
-    // Keep in sync with DEFAULT_MODEL in config.py (enforced by tests/unit/test_config.py)
-    const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
+    // Populated from /api/status before models load (DEFAULT_MODEL in
+    // config.py is the single source of truth)
+    let defaultModel = '';
 
     // Prompt editor elements and constants
     const PROMPT_STORAGE_KEY = 'chat-rag-selected-prompt';
@@ -336,11 +340,11 @@ document.addEventListener('DOMContentLoaded', () => {
             SettingsLogger.info('Restored previously saved model', { model: savedModel });
         } else {
             // Try to select default model
-            if (modelSelect.querySelector(`option[value="${DEFAULT_MODEL}"]`)) {
-                modelSelect.value = DEFAULT_MODEL;
-                SettingsLogger.info('Using default model (no saved selection)', { model: DEFAULT_MODEL });
+            if (defaultModel && modelSelect.querySelector(`option[value="${defaultModel}"]`)) {
+                modelSelect.value = defaultModel;
+                SettingsLogger.info('Using default model (no saved selection)', { model: defaultModel });
             } else {
-                SettingsLogger.warn('Default model not available in model list', { defaultModel: DEFAULT_MODEL });
+                SettingsLogger.warn('Default model not available in model list', { defaultModel });
             }
         }
         updateModelDetails();
@@ -1150,7 +1154,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.valid) {
                 ragPathStatus.innerHTML = `<span class="status-ok">${data.message}</span>`;
             } else {
-                ragPathStatus.innerHTML = `<span class="status-error">${data.message}</span>`;
+                ragPathStatus.innerHTML = `<span class="status-error">${data.message || data.error || 'Validation failed'}</span>`;
             }
         } catch (error) {
             ragPathStatus.innerHTML = '<span class="status-error">Validation failed</span>';
@@ -1230,7 +1234,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ragTestResult.innerHTML = `
                     <div class="test-error">
                         <strong>Connection failed</strong>
-                        <p>${data.message}</p>
+                        <p>${data.message || data.error || 'Unexpected error'}</p>
                     </div>`;
                 ragCollectionSection.style.display = 'none';
             }

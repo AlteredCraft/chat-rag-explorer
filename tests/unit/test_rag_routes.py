@@ -131,7 +131,6 @@ class TestDiscoverDatabasesRoute:
 
         assert response.status_code == 500
         data = json.loads(response.data)
-        assert data["success"] is False
         assert "error" in data
 
 

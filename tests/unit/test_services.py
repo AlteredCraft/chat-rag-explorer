@@ -1,46 +1,19 @@
 """
-Unit tests for services.py pure helper functions.
+Unit tests for services.py.
 
-Tests the extracted pure functions that don't require mocking.
+Tests the extracted pure helper functions and the chat_stream typed
+event protocol (with a mocked OpenAI client - no network calls).
 """
 import json
 import pytest
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import patch, MagicMock
 from chat_rag_explorer.services import (
-    mask_api_key,
     build_chat_params,
     extract_usage_data,
-    format_metadata_marker,
     sort_models_by_name,
     get_models_list_status,
 )
-
-
-class TestMaskApiKey:
-    """Tests for mask_api_key function."""
-
-    def test_masks_long_key(self):
-        """Long API keys show first 8 and last 4 chars."""
-        key = "sk-1234567890abcdefghij"
-        assert mask_api_key(key) == "sk-12345...ghij"
-
-    def test_masks_exactly_13_chars(self):
-        """Keys with exactly 13 chars are masked."""
-        key = "1234567890123"
-        assert mask_api_key(key) == "12345678...0123"
-
-    def test_short_key_returns_missing(self):
-        """Keys with 12 or fewer chars return [MISSING]."""
-        assert mask_api_key("123456789012") == "[MISSING]"
-        assert mask_api_key("short") == "[MISSING]"
-
-    def test_empty_string_returns_missing(self):
-        """Empty string returns [MISSING]."""
-        assert mask_api_key("") == "[MISSING]"
-
-    def test_none_returns_missing(self):
-        """None returns [MISSING]."""
-        assert mask_api_key(None) == "[MISSING]"
 
 
 class TestBuildChatParams:
@@ -129,27 +102,84 @@ class TestExtractUsageData:
         assert result is None
 
 
-class TestFormatMetadataMarker:
-    """Tests for format_metadata_marker function."""
+def _make_content_chunk(text):
+    """Create a mock stream chunk carrying content."""
+    return SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(content=text))],
+        usage=None,
+        model=None,
+    )
 
-    def test_formats_as_prefixed_json(self):
-        """Formats usage data as __METADATA__:{json}."""
-        usage = {"prompt_tokens": 10, "total_tokens": 15}
 
-        result = format_metadata_marker(usage)
+def _make_usage_chunk(prompt, completion, total, model="provider/model"):
+    """Create a mock stream chunk carrying usage data (no choices)."""
+    return SimpleNamespace(
+        choices=[],
+        usage=SimpleNamespace(
+            prompt_tokens=prompt, completion_tokens=completion, total_tokens=total
+        ),
+        model=model,
+    )
 
-        assert result.startswith("__METADATA__:")
-        parsed = json.loads(result[len("__METADATA__:"):])
-        assert parsed == usage
 
-    def test_json_is_parseable(self):
-        """Output JSON can be parsed back."""
-        usage = {"prompt_tokens": 100, "completion_tokens": 50}
-        result = format_metadata_marker(usage)
+class TestChatStream:
+    """Tests for ChatService.chat_stream typed (kind, payload) events."""
 
-        json_part = result[len("__METADATA__:"):]
-        parsed = json.loads(json_part)
-        assert parsed == usage
+    def _service_with_stream(self, chunks=None, error=None):
+        """Build a ChatService whose client streams the given chunks."""
+        from chat_rag_explorer.services import ChatService
+
+        service = ChatService()
+        mock_client = MagicMock()
+        if error is not None:
+            mock_client.chat.completions.create.side_effect = error
+        else:
+            mock_client.chat.completions.create.return_value = iter(chunks)
+        service.client = mock_client
+        return service
+
+    def test_yields_content_events(self):
+        """Content chunks arrive as ("content", text) events."""
+        service = self._service_with_stream(
+            [_make_content_chunk("Hello"), _make_content_chunk(" world")]
+        )
+
+        events = list(service.chat_stream([{"role": "user", "content": "hi"}], model="m"))
+
+        assert events == [("content", "Hello"), ("content", " world")]
+
+    def test_yields_usage_event(self):
+        """Usage data arrives as a ("usage", dict) event."""
+        service = self._service_with_stream(
+            [_make_content_chunk("Hi"), _make_usage_chunk(10, 20, 30)]
+        )
+
+        events = list(service.chat_stream([{"role": "user", "content": "hi"}], model="m"))
+
+        assert ("usage", {
+            "prompt_tokens": 10,
+            "completion_tokens": 20,
+            "total_tokens": 30,
+            "model": "provider/model",
+        }) in events
+
+    def test_skips_none_content(self):
+        """Chunks whose delta content is None produce no event."""
+        service = self._service_with_stream(
+            [_make_content_chunk(None), _make_content_chunk("Text")]
+        )
+
+        events = list(service.chat_stream([{"role": "user", "content": "hi"}], model="m"))
+
+        assert events == [("content", "Text")]
+
+    def test_yields_error_event_on_exception(self):
+        """An API exception surfaces as a single ("error", message) event."""
+        service = self._service_with_stream(error=RuntimeError("boom"))
+
+        events = list(service.chat_stream([{"role": "user", "content": "hi"}], model="m"))
+
+        assert events == [("error", "boom")]
 
 
 class TestSortModelsByName:

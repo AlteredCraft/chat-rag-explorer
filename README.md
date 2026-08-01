@@ -171,17 +171,9 @@ Delete the file entirely to show every OpenRouter model (⚠️ hundreds of entr
 
 ### `DEFAULT_MODEL` — what's selected before the user chooses
 
-The default is declared in **three** places, and they must agree:
+The default is declared once, in `config.py` (override it with the `DEFAULT_MODEL` environment variable). The frontend fetches it from `/api/status` on page load, so the chat page and the Settings picker always agree with the backend — there is nothing to keep in sync by hand.
 
-| Location | Role |
-|----------|------|
-| `config.py` | Backend fallback when a request arrives with no model specified |
-| `chat_rag_explorer/static/script.js` | What the chat page sends before anything is saved |
-| `chat_rag_explorer/static/settings.js` | What the Settings picker pre-selects |
-
-The browser sends a model ID on *every* chat request, so the frontend constants are what a first-time visitor actually gets — the backend fallback rarely fires in practice. Change the default in all three, and keep it present in `.models_list` or it won't be selectable.
-
-`tests/unit/test_config.py` enforces both rules, so drift fails the suite rather than surfacing as a confusing runtime error.
+Keep the default present in `.models_list` or it won't be selectable; `tests/unit/test_config.py` enforces that rule, so drift fails the suite rather than surfacing as a confusing runtime error.
 
 > **Changed the default and nothing happened?** Your model choice is remembered in `localStorage` under `chat-rag-selected-model`, and a saved choice always wins over the default. To see the new default, pick a different model in Settings, or clear site data in your browser's DevTools (Application → Local Storage).
 

@@ -17,9 +17,9 @@ import logging
 from pathlib import Path
 
 import chromadb
-from chromadb.config import Settings
+from flask import current_app
 
-from config import Config
+from chat_rag_explorer.utils import mask_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,23 @@ DEFAULT_RAG_CONFIG = {
     'n_results': 5,            # Number of documents to retrieve per query
     'distance_threshold': None,  # Max distance filter (None = no filtering)
 }
+
+
+def _describe_target(config_data):
+    """Build a human-readable description of the ChromaDB target for UI messages.
+
+    Args:
+        config_data: RAG config dict with mode and connection fields
+
+    Returns:
+        String like "local ChromaDB at ./data/chroma_db"
+    """
+    mode = config_data.get('mode', 'local')
+    if mode == 'server':
+        return f"ChromaDB server at {config_data.get('server_host')}:{config_data.get('server_port')}"
+    if mode == 'cloud':
+        return f"ChromaDB Cloud ({config_data.get('cloud_tenant')}/{config_data.get('cloud_database')})"
+    return f"local ChromaDB at {config_data.get('local_path')}"
 
 
 class RagConfigService:
@@ -273,90 +290,32 @@ class RagConfigService:
             }
 
     def test_connection(self, config_data, request_id=None):
-        """Test ChromaDB connection with given configuration."""
+        """Test ChromaDB connection with given configuration.
+
+        Validates local paths via validate_local_path(), creates the client
+        via _create_client() (the single source of mode dispatch), and lists
+        collections to prove the connection works.
+        """
         log_prefix = f"[{request_id}] " if request_id else ""
         mode = config_data.get('mode', 'local')
 
+        # Local mode gets path diagnostics before touching ChromaDB
+        if mode == 'local':
+            validation = self.validate_local_path(config_data.get('local_path'), request_id)
+            if not validation['valid']:
+                return {'success': False, 'message': validation['message']}
+
         try:
-            if mode == 'local':
-                path = config_data.get('local_path')
-                if not path:
-                    return {'success': False, 'message': 'Local path is required'}
+            client = self._create_client(config_data, request_id)
+            collection_names = [c.name for c in client.list_collections()]
 
-                path_obj = Path(path)
-
-                # Check if path exists
-                if not path_obj.exists():
-                    return {'success': False, 'message': f'Path does not exist: {path}'}
-
-                # Check if it's a directory
-                if not path_obj.is_dir():
-                    return {'success': False, 'message': f'Path is not a directory: {path}'}
-
-                # Check for ChromaDB database files (chroma.sqlite3 is the main marker)
-                chroma_db_file = path_obj / 'chroma.sqlite3'
-                if not chroma_db_file.exists():
-                    return {
-                        'success': False,
-                        'message': f'No ChromaDB database found at {path}',
-                        'details': 'Expected chroma.sqlite3 file not found. Ensure the path points to an existing ChromaDB database.'
-                    }
-
-                client = chromadb.PersistentClient(path=path)
-                collections = client.list_collections()
-                collection_names = [c.name for c in collections]
-
-                logger.info(f"{log_prefix}Local connection successful: {path}")
-                return {
-                    'success': True,
-                    'message': f'Connected to local ChromaDB at {path}',
-                    'collections': collection_names
-                }
-
-            elif mode == 'server':
-                host = config_data.get('server_host', 'localhost')
-                port = int(config_data.get('server_port', 8000))
-
-                client = chromadb.HttpClient(host=host, port=port)
-                collections = client.list_collections()
-                collection_names = [c.name for c in collections]
-
-                logger.info(f"{log_prefix}Server connection successful: {host}:{port}")
-                return {
-                    'success': True,
-                    'message': f'Connected to ChromaDB server at {host}:{port}',
-                    'collections': collection_names
-                }
-
-            elif mode == 'cloud':
-                tenant = config_data.get('cloud_tenant')
-                database = config_data.get('cloud_database')
-                api_key = Config.CHROMADB_API_KEY
-
-                if not tenant:
-                    return {'success': False, 'message': 'Tenant ID is required'}
-                if not database:
-                    return {'success': False, 'message': 'Database name is required'}
-                if not api_key:
-                    return {'success': False, 'message': 'CHROMADB_API_KEY not configured in .env'}
-
-                client = chromadb.CloudClient(
-                    tenant=tenant,
-                    database=database,
-                    api_key=api_key
-                )
-                collections = client.list_collections()
-                collection_names = [c.name for c in collections]
-
-                logger.info(f"{log_prefix}Cloud connection successful: {tenant}/{database}")
-                return {
-                    'success': True,
-                    'message': f'Connected to ChromaDB Cloud ({tenant}/{database})',
-                    'collections': collection_names
-                }
-
-            else:
-                return {'success': False, 'message': f'Unknown mode: {mode}'}
+            target = _describe_target(config_data)
+            logger.info(f"{log_prefix}Connection successful: {target}")
+            return {
+                'success': True,
+                'message': f'Connected to {target}',
+                'collections': collection_names
+            }
 
         except Exception as e:
             logger.error(f"{log_prefix}Connection test failed: {e}")
@@ -364,18 +323,12 @@ class RagConfigService:
 
     def get_api_key_status(self, request_id=None):
         """Check if CHROMADB_API_KEY is configured in environment."""
-        api_key = Config.CHROMADB_API_KEY
+        api_key = current_app.config.get("CHROMADB_API_KEY")
 
         if not api_key:
             return {'configured': False, 'masked': None}
 
-        # Mask the key (show first 4 and last 4 chars)
-        if len(api_key) > 8:
-            masked = api_key[:4] + '...' + api_key[-4:]
-        else:
-            masked = '****'
-
-        return {'configured': True, 'masked': masked}
+        return {'configured': True, 'masked': mask_api_key(api_key)}
 
     def _create_client(self, config_data, request_id=None):
         """Create a ChromaDB client based on config mode."""
@@ -396,12 +349,13 @@ class RagConfigService:
         elif mode == 'cloud':
             tenant = config_data.get('cloud_tenant')
             database = config_data.get('cloud_database')
-            api_key = Config.CHROMADB_API_KEY
 
             if not tenant:
                 raise ValueError('Tenant ID is required')
             if not database:
                 raise ValueError('Database name is required')
+
+            api_key = current_app.config.get('CHROMADB_API_KEY')
             if not api_key:
                 raise ValueError('CHROMADB_API_KEY not configured in .env')
 
