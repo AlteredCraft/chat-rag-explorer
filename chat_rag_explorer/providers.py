@@ -31,6 +31,10 @@ from flask import current_app
 
 logger = logging.getLogger(__name__)
 
+# Valid LLM_PROVIDER values. Startup validation (main.py) and the
+# selection switch below both check against this list.
+SUPPORTED_PROVIDERS = ("openrouter", "ollama")
+
 
 @dataclass(frozen=True)
 class Provider:
@@ -72,7 +76,7 @@ def get_active_provider():
 
     raise ValueError(
         f"Unknown LLM_PROVIDER: '{provider_name}'. "
-        f"Set LLM_PROVIDER in your .env to 'openrouter' or 'ollama'."
+        f"Set LLM_PROVIDER in your .env to one of: {', '.join(SUPPORTED_PROVIDERS)}."
     )
 
 

@@ -24,6 +24,7 @@ from pathlib import Path
 
 from chat_rag_explorer import create_app, is_reloader_process
 from chat_rag_explorer.logging import setup_logging
+from chat_rag_explorer.providers import SUPPORTED_PROVIDERS
 from config import Config
 
 # Configure logging early so all startup functions can log properly
@@ -37,6 +38,7 @@ def validate_environment() -> None:
     Validate required environment configuration exists.
 
     Checks:
+    - LLM_PROVIDER names a supported provider
     - .env file exists in project root
     - OPENROUTER_API_KEY is set when OpenRouter is the active provider
       (Ollama needs no key locally, so it is not checked)
@@ -44,6 +46,13 @@ def validate_environment() -> None:
     Logs warnings if validation fails but allows the app to start.
     The frontend will display appropriate messaging when API key is missing.
     """
+    if Config.LLM_PROVIDER not in SUPPORTED_PROVIDERS:
+        logger.warning("=" * 60)
+        logger.warning(f"LLM_PROVIDER is set to '{Config.LLM_PROVIDER}', which is not supported!")
+        logger.warning(f"Set LLM_PROVIDER in .env to one of: {', '.join(SUPPORTED_PROVIDERS)}")
+        logger.warning("API calls will fail until this is fixed.")
+        logger.warning("=" * 60)
+
     env_path = Path(__file__).parent / ".env"
 
     if not env_path.exists():

@@ -284,7 +284,7 @@ chat-rag-explorer/
 
 ## Configuration
 
-All settings live in `.env` (copied from `.env.example`). Only `OPENROUTER_API_KEY` is required — unless you use [Ollama](#using-ollama-instead-of-openrouter), which needs no key locally.
+All settings live in `.env` (copied from `.env.example`). Only `OPENROUTER_API_KEY` is required with the default OpenRouter provider. A local [Ollama](#using-ollama-instead-of-openrouter) needs no key at all; Ollama cloud needs `OLLAMA_API_KEY`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
