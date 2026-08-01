@@ -734,7 +734,29 @@ class TestQueryCollection:
 
         assert result["success"] is False
         assert "connection failed" in result["message"].lower()
+        # The message says what was queried and where to fix it
+        assert "local chromadb" in result["message"].lower()
+        assert "settings" in result["message"].lower()
         assert result["documents"] == []
+
+    def test_query_with_stale_local_path_reports_path_problem(self, tmp_path, monkeypatch):
+        """A missing local path fails with a path message instead of silently
+        creating an empty database (PersistentClient's default behavior)."""
+        service = RagConfigService()
+        config_path = tmp_path / "rag_config.json"
+        missing_db = tmp_path / "deleted_db"
+        config_path.write_text(json.dumps({
+            "mode": "local",
+            "local_path": str(missing_db),
+            "collection": "test_collection"
+        }))
+        monkeypatch.setattr(service, "_get_config_path", lambda: config_path)
+
+        result = service.query_collection("test query")
+
+        assert result["success"] is False
+        assert "path does not exist" in result["message"].lower()
+        assert not missing_db.exists()  # no empty database was created
 
     @patch("chat_rag_explorer.rag_config_service.chromadb.PersistentClient")
     def test_uses_config_defaults(self, mock_client_class, tmp_path, monkeypatch):

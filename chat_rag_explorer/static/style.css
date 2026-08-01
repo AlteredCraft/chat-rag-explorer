@@ -1550,6 +1550,14 @@ button:focus-visible {
     line-height: 1.4;
 }
 
+/* Error variant - retrieval itself failed (e.g. misconfigured ChromaDB) */
+.details-rag-callout-error {
+    color: #721c24;
+    background: #f8d7da;
+    border-color: #f5c6cb;
+    border-left-color: #dc3545;
+}
+
 /* Message blocks in details */
 .details-message {
     margin-bottom: 0.75rem;
@@ -2600,6 +2608,18 @@ button:focus-visible {
     color: #4a5568;
 }
 
+/* Error variant - retrieval failed; the pill reads as a warning */
+.rag-context-label.rag-context-error {
+    color: #721c24;
+    background: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+/* The label text carries its own warning glyph, so drop the book icon */
+.rag-context-label.rag-context-error::before {
+    display: none;
+}
+
 .rag-context {
     border: 1px solid #e0e4e8;
     border-radius: 0.5rem;
@@ -2835,6 +2855,18 @@ button:focus-visible {
 
 .info-box-neutral .info-box-content code {
     background: rgba(0, 0, 0, 0.06);
+}
+
+/* Error state - the model list could not be loaded from the provider */
+.info-box-error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.info-box-error .info-icon-circle {
+    background: #dc3545;
+    color: #fff;
 }
 
 /* ===== Responsive Layout ===== */

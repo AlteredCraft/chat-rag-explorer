@@ -15,6 +15,7 @@ from pathlib import Path
 from openai import OpenAI
 from flask import current_app
 
+from chat_rag_explorer.error_messages import describe_chat_error
 from chat_rag_explorer.providers import get_active_provider, list_models
 from chat_rag_explorer.utils import mask_api_key
 
@@ -177,7 +178,6 @@ class ChatService:
             request_id: Optional request ID for log correlation
         """
         req_id = request_id or "no-id"
-        client = self.get_client()
         target_model = model or current_app.config["DEFAULT_MODEL"]
 
         logger.info(f"[{req_id}] Starting chat stream - Model: {target_model}, temperature: {temperature}, top_p: {top_p}")
@@ -187,6 +187,11 @@ class ChatService:
         first_chunk_time = None
 
         try:
+            # Client creation happens inside the try so a misconfigured
+            # provider surfaces as a clean ("error", ...) event instead of
+            # an exception that breaks the HTTP stream mid-response
+            client = self.get_client()
+
             # Build API call parameters
             api_params = build_chat_params(target_model, messages, temperature, top_p)
             stream = client.chat.completions.create(**api_params)
@@ -233,7 +238,9 @@ class ChatService:
         except Exception as e:
             elapsed = time.time() - stream_start_time
             logger.error(f"[{req_id}] Stream error after {elapsed:.3f}s: {type(e).__name__}: {str(e)}", exc_info=True)
-            yield ("error", str(e))
+            # The raw error is in the log above; the user gets a message
+            # that says what is misconfigured and where to fix it
+            yield ("error", describe_chat_error(e, get_active_provider(), target_model))
 
 
     def get_models(self, request_id=None):

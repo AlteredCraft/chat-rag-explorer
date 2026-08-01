@@ -173,13 +173,44 @@ class TestChatStream:
 
         assert events == [("content", "Text")]
 
-    def test_yields_error_event_on_exception(self):
+    def test_yields_error_event_on_exception(self, app_context):
         """An API exception surfaces as a single ("error", message) event."""
         service = self._service_with_stream(error=RuntimeError("boom"))
 
         events = list(service.chat_stream([{"role": "user", "content": "hi"}], model="m"))
 
         assert events == [("error", "boom")]
+
+    def test_authentication_error_yields_friendly_message(self, app_context):
+        """A rejected API key surfaces as an actionable message, not raw SDK text."""
+        import httpx
+        import openai
+
+        request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+        response = httpx.Response(401, request=request)
+        error = openai.AuthenticationError("Error code: 401", response=response, body=None)
+        service = self._service_with_stream(error=error)
+
+        events = list(service.chat_stream([{"role": "user", "content": "hi"}], model="m"))
+
+        assert len(events) == 1
+        kind, message = events[0]
+        assert kind == "error"
+        assert "OPENROUTER_API_KEY" in message
+
+    def test_client_creation_failure_yields_error_event(self, app_context):
+        """A client that cannot be built yields an error event instead of raising."""
+        from chat_rag_explorer.services import ChatService
+
+        app_context.config["OPENROUTER_API_KEY"] = None
+        service = ChatService()
+
+        events = list(service.chat_stream([{"role": "user", "content": "hi"}], model="m"))
+
+        assert len(events) == 1
+        kind, message = events[0]
+        assert kind == "error"
+        assert "not configured" in message
 
 
 class TestSortModelsByName:
