@@ -325,6 +325,28 @@ class TestChatServiceIsConfigured:
 
         assert service.is_configured() is False
 
+    def test_returns_false_when_provider_unresolvable(self, app_context):
+        """An unset LLM_PROVIDER reports unconfigured instead of raising.
+
+        /api/status calls this on every page load, so raising here would
+        turn a fixable .env mistake into a 500 that hides the real cause.
+        """
+        from chat_rag_explorer.services import ChatService
+
+        app_context.config["LLM_PROVIDER"] = ""
+        service = ChatService()
+
+        assert service.is_configured() is False
+
+    def test_returns_false_when_provider_unsupported(self, app_context):
+        """Same for a typo'd provider name."""
+        from chat_rag_explorer.services import ChatService
+
+        app_context.config["LLM_PROVIDER"] = "openroutr"
+        service = ChatService()
+
+        assert service.is_configured() is False
+
 
 class TestGetModelsListStatus:
     """Tests for get_models_list_status function."""

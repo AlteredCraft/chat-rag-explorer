@@ -135,10 +135,18 @@ class ChatService:
     def is_configured(self):
         """Check if the active provider's API key is configured.
 
+        An unresolvable provider (LLM_PROVIDER unset or misspelled) counts
+        as not configured rather than an exception: /api/status calls this
+        on every page load, and raising would turn a fixable .env mistake
+        into a 500 that hides the real cause.
+
         Returns:
-            bool: True if API key is set and non-empty, False otherwise
+            bool: True if a provider resolves and its API key is non-empty
         """
-        return bool(get_active_provider().api_key)
+        try:
+            return bool(get_active_provider().api_key)
+        except ValueError:
+            return False
 
     def get_client(self):
         if not self.client:
@@ -239,8 +247,15 @@ class ChatService:
             elapsed = time.time() - stream_start_time
             logger.error(f"[{req_id}] Stream error after {elapsed:.3f}s: {type(e).__name__}: {str(e)}", exc_info=True)
             # The raw error is in the log above; the user gets a message
-            # that says what is misconfigured and where to fix it
-            yield ("error", describe_chat_error(e, get_active_provider(), target_model))
+            # that says what is misconfigured and where to fix it.
+            # Resolving the provider can itself fail (LLM_PROVIDER unset),
+            # and when it does that is the more useful thing to report.
+            try:
+                provider = get_active_provider()
+            except ValueError as provider_error:
+                yield ("error", str(provider_error))
+            else:
+                yield ("error", describe_chat_error(e, provider, target_model))
 
 
     def get_models(self, request_id=None):

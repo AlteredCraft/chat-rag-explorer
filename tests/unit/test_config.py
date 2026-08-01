@@ -170,14 +170,19 @@ class TestConfig:
         finally:
             importlib.reload(config)
 
-    def test_llm_provider_defaults_to_openrouter(self):
-        """LLM_PROVIDER defaults to openrouter when not set."""
+    def test_llm_provider_has_no_default(self):
+        """LLM_PROVIDER is required: unset resolves to empty, never a silent default.
+
+        A default here would let a user who never set LLM_PROVIDER end up
+        talking to OpenRouter without having chosen it. Startup validation
+        reports the empty value instead.
+        """
         import importlib
         import config
         try:
             with patch.dict(os.environ, {}, clear=True):
                 importlib.reload(config)
-                assert config.Config.LLM_PROVIDER == "openrouter"
+                assert config.Config.LLM_PROVIDER == ""
         finally:
             importlib.reload(config)
 

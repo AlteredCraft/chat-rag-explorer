@@ -793,3 +793,36 @@ class TestGetModelsErrors:
 
         assert response.status_code == 502
         assert "kaput" in response.get_json()["error"]
+
+
+class TestUnconfiguredProviderGuard:
+    """Endpoints must explain an unset LLM_PROVIDER, not 500 on it."""
+
+    def test_models_reports_unset_provider(self, app, client):
+        """/api/models returns the actionable message rather than a stack trace."""
+        app.config["LLM_PROVIDER"] = ""
+
+        response = client.get("/api/models")
+
+        assert response.status_code == 503
+        assert "LLM_PROVIDER" in response.get_json()["error"]
+
+    def test_chat_reports_unset_provider(self, app, client):
+        """/api/chat rejects before streaming so the error is readable."""
+        app.config["LLM_PROVIDER"] = ""
+
+        response = client.post("/api/chat", json={
+            "messages": [{"role": "user", "content": "Hi"}],
+        })
+
+        assert response.status_code == 503
+        assert "LLM_PROVIDER" in response.get_json()["error"]
+
+    def test_status_still_responds_with_unset_provider(self, app, client):
+        """/api/status runs on every page load and must never 500."""
+        app.config["LLM_PROVIDER"] = ""
+
+        response = client.get("/api/status")
+
+        assert response.status_code == 200
+        assert response.get_json()["api_key_configured"] is False

@@ -15,11 +15,12 @@ at least the fields the frontend consumes:
 
     id, name, context_length, pricing
 
-Supported providers are OpenRouter (LLM_PROVIDER=openrouter, the
-default) and Ollama local or cloud (LLM_PROVIDER=ollama). Adding
-another means extending the switch in get_active_provider() and adding
-a _list_<provider>_models() function here - the chat streaming code
-does not change.
+Supported providers are OpenRouter (LLM_PROVIDER=openrouter) and Ollama
+local or cloud (LLM_PROVIDER=ollama). LLM_PROVIDER is required and has
+no default, so an unset value is an error rather than a silent choice.
+Adding another provider means extending the switch in
+get_active_provider() and adding a _list_<provider>_models() function
+here - the chat streaming code does not change.
 """
 import logging
 import time
@@ -56,9 +57,17 @@ def get_active_provider():
         Provider for the currently configured LLM backend
 
     Raises:
-        ValueError: If LLM_PROVIDER names an unsupported provider
+        ValueError: If LLM_PROVIDER is unset or names an unsupported
+            provider. Callers on an error path should catch this rather
+            than let it mask the failure they were already reporting.
     """
-    provider_name = current_app.config.get("LLM_PROVIDER", "openrouter")
+    provider_name = current_app.config.get("LLM_PROVIDER")
+
+    if not provider_name:
+        raise ValueError(
+            f"LLM_PROVIDER is not set. Add it to your .env as one of: "
+            f"{', '.join(SUPPORTED_PROVIDERS)}."
+        )
 
     if provider_name == "openrouter":
         return Provider(

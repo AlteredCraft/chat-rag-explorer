@@ -66,6 +66,34 @@ class TestGetActiveProvider:
             with pytest.raises(ValueError, match="Unknown LLM_PROVIDER"):
                 get_active_provider()
 
+    def test_unset_llm_provider_raises_rather_than_defaulting(self, app):
+        """An unset provider is an error, not a silent fallback to OpenRouter."""
+        app.config["LLM_PROVIDER"] = ""
+
+        with app.app_context():
+            with pytest.raises(ValueError, match="LLM_PROVIDER is not set"):
+                get_active_provider()
+
+    def test_missing_llm_provider_key_raises(self, app):
+        """Same when the config key is absent entirely, not just empty."""
+        app.config.pop("LLM_PROVIDER", None)
+
+        with app.app_context():
+            with pytest.raises(ValueError, match="LLM_PROVIDER is not set"):
+                get_active_provider()
+
+    def test_unset_provider_error_names_the_valid_options(self, app):
+        """The message tells the user what to set and to what."""
+        app.config["LLM_PROVIDER"] = ""
+
+        with app.app_context():
+            with pytest.raises(ValueError) as exc_info:
+                get_active_provider()
+
+        message = str(exc_info.value)
+        assert "openrouter" in message
+        assert "ollama" in message
+
 
 class TestListModels:
     """Tests for list_models() with mocked HTTP."""

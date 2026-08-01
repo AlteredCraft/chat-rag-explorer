@@ -18,9 +18,12 @@ load_dotenv()
 
 
 class Config:
-    # Which LLM provider serves chat and model listing: "openrouter"
-    # (default) or "ollama". See providers.py for the seam.
-    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openrouter").strip().lower()
+    # Which LLM provider serves chat and model listing: "openrouter" or
+    # "ollama". Required, with no default on purpose - defaulting would
+    # let someone who never made the choice land on OpenRouter and be
+    # puzzled by the resulting API key errors. An empty value is reported
+    # at startup (main.py) and by get_active_provider(). See providers.py.
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "").strip().lower()
 
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
     OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")

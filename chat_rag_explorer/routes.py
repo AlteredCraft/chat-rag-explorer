@@ -246,10 +246,19 @@ def get_status():
 def get_models():
     logger.info(f"[{g.request_id}] GET /api/models - Fetching available models")
 
+    # Resolve the provider up front: describing a listing failure needs a
+    # provider, so an unresolvable one has to be reported on its own terms
+    # rather than raising inside the handler below.
+    try:
+        provider = get_active_provider()
+    except ValueError as e:
+        logger.warning(f"[{g.request_id}] GET /api/models - Rejected: {e}")
+        return jsonify({"error": str(e)}), 503
+
     try:
         models = chat_service.get_models(g.request_id)
     except Exception as e:
-        message = describe_model_list_error(e, get_active_provider())
+        message = describe_model_list_error(e, provider)
         logger.error(f"[{g.request_id}] GET /api/models - Failed: {message} ({request_elapsed():.3f}s)")
         return jsonify({"error": message}), 502
 
@@ -387,8 +396,16 @@ def chat():
         logger.warning(f"[{request_id}] POST /api/chat - Rejected: no messages provided")
         return {"error": "Messages are required"}, 400
 
+    # An unresolvable provider is reported on its own terms; without it
+    # there is nothing to name in a missing-API-key message.
+    try:
+        provider = get_active_provider()
+    except ValueError as e:
+        logger.warning(f"[{request_id}] POST /api/chat - Rejected: {e}")
+        return jsonify({"error": str(e)}), 503
+
     if not chat_service.is_configured():
-        message = missing_api_key_message(get_active_provider())
+        message = missing_api_key_message(provider)
         logger.warning(f"[{request_id}] POST /api/chat - Rejected: {message}")
         return jsonify({"error": message}), 503
 

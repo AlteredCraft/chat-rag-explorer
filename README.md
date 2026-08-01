@@ -52,15 +52,18 @@ You should see all tests pass. These run entirely offline — no API key and no 
 cp .env.example .env
 ```
 
-Open `.env` and set your key:
+Open `.env` and set your provider and key:
 
 ```env
+LLM_PROVIDER=openrouter
 OPENROUTER_API_KEY=sk-or-v1-your-key-here
 ```
 
+Both are required — `LLM_PROVIDER` has no default, so the app asks you to choose rather than assuming. `.env.example` ships with `openrouter` already filled in, so in practice you only edit the key.
+
 `.env` is gitignored, so your key will not be committed. Every other setting in that file is optional and already has a sensible default.
 
-> Running models locally instead? Skip the key and set `LLM_PROVIDER=ollama` — see [Using Ollama instead of OpenRouter](#using-ollama-instead-of-openrouter).
+> Running models locally instead? Skip the key and change `LLM_PROVIDER` to `ollama` — see [Using Ollama instead of OpenRouter](#using-ollama-instead-of-openrouter).
 
 `.env` is read once at startup, so if the app is already running, stop it with `Ctrl+C` and start it again before your key takes effect.
 
@@ -201,6 +204,7 @@ Workshop attendees can also reach us at [info@alteredcraft.com](mailto:info@alte
 | `401` / `User not found` | The key reached OpenRouter and was rejected. It's invalid, revoked, or belongs to a deleted account — reissue at [openrouter.ai/keys](https://openrouter.ai/keys). A correctly *formatted* key can still be rejected. |
 | `402` / insufficient credits | The key is valid but the account is out of funds. [Add credit](https://openrouter.ai/settings/credits) or switch to a free model. |
 | Key set but still unauthorized | `.env` is read at startup only. Stop the app with `Ctrl+C` and start it again. |
+| "LLM_PROVIDER is not set" | It's required and has no default. Add `LLM_PROVIDER=openrouter` (or `ollama`) to `.env` and restart. An `.env` copied from an older `.env.example` won't have it. |
 | Nothing in the model picker | Every ID in `.models_list` must exist upstream. Compare against [OpenRouter's catalog](https://openrouter.ai/models), or delete the file to show everything. Using Ollama? The file ships with OpenRouter IDs — see [Model Selection](#model-selection). |
 | "Could not reach ollama" | Ollama isn't running or the base URL is wrong. Start it with `ollama serve`, or check `OLLAMA_BASE_URL` in `.env`. |
 | First RAG query hangs | It's downloading the ~79 MB embedding model. Let it finish once. |
@@ -345,11 +349,13 @@ chat-rag-explorer/
 
 ## Configuration
 
-All settings live in `.env` (copied from `.env.example`). Only `OPENROUTER_API_KEY` is required with the default OpenRouter provider. A local [Ollama](#using-ollama-instead-of-openrouter) needs no key at all; Ollama cloud needs `OLLAMA_API_KEY`.
+All settings live in `.env` (copied from `.env.example`). Two are required: `LLM_PROVIDER`, and — with OpenRouter — `OPENROUTER_API_KEY`. A local [Ollama](#using-ollama-instead-of-openrouter) needs no key at all; Ollama cloud needs `OLLAMA_API_KEY`.
+
+`LLM_PROVIDER` deliberately has no default in code. Defaulting it would let someone who never made the choice end up on OpenRouter and then be puzzled by the API key errors, so the app reports an unset value at startup and in the UI instead.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `LLM_PROVIDER` | `openrouter` | Which provider serves chat: `openrouter` or `ollama` |
+| `LLM_PROVIDER` | — | **Required.** Which provider serves chat: `openrouter` or `ollama` |
 | `OPENROUTER_API_KEY` | — | **Required** with OpenRouter. Your OpenRouter key |
 | `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Ollama endpoint; `https://ollama.com/v1` for cloud |
 | `OLLAMA_API_KEY` | `ollama` (placeholder) | Only needed for Ollama cloud |

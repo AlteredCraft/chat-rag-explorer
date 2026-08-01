@@ -38,7 +38,8 @@ def validate_environment() -> None:
     Validate required environment configuration exists.
 
     Checks:
-    - LLM_PROVIDER names a supported provider
+    - LLM_PROVIDER is set and names a supported provider (it is required
+      and has no default, so "unset" is its own reported failure)
     - .env file exists in project root
     - OPENROUTER_API_KEY is set when OpenRouter is the active provider
       (Ollama needs no key locally, so it is not checked)
@@ -46,7 +47,14 @@ def validate_environment() -> None:
     Logs warnings if validation fails but allows the app to start.
     The frontend will display appropriate messaging when API key is missing.
     """
-    if Config.LLM_PROVIDER not in SUPPORTED_PROVIDERS:
+    if not Config.LLM_PROVIDER:
+        logger.warning("=" * 60)
+        logger.warning("LLM_PROVIDER is not set!")
+        logger.warning(f"Add it to .env as one of: {', '.join(SUPPORTED_PROVIDERS)}")
+        logger.warning("  LLM_PROVIDER=openrouter")
+        logger.warning("API calls will fail until this is fixed.")
+        logger.warning("=" * 60)
+    elif Config.LLM_PROVIDER not in SUPPORTED_PROVIDERS:
         logger.warning("=" * 60)
         logger.warning(f"LLM_PROVIDER is set to '{Config.LLM_PROVIDER}', which is not supported!")
         logger.warning(f"Set LLM_PROVIDER in .env to one of: {', '.join(SUPPORTED_PROVIDERS)}")
