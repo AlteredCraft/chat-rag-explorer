@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/AlteredCraft/chat-rag-explorer/compare/chat-rag-explorer-v0.3.0...chat-rag-explorer-v0.4.0) (2026-08-01)
+
+
+### Features
+
+* add Ollama (local and cloud) as an LLM provider ([15f19d6](https://github.com/AlteredCraft/chat-rag-explorer/commit/15f19d6fc16e453b5bd1d0d3e0d261cd5f5fab06)), closes [#28](https://github.com/AlteredCraft/chat-rag-explorer/issues/28)
+* capture misconfiguration errors and show helpful messages ([6c99adb](https://github.com/AlteredCraft/chat-rag-explorer/commit/6c99adb4ec5529997f54f85875f3f00009c60b0e))
+
+
+### Bug Fixes
+
+* correct typo in ingest corpus selection prompt ([2ba1a0d](https://github.com/AlteredCraft/chat-rag-explorer/commit/2ba1a0d0dc910245b543ebbe5b531fb9b613c0cc))
+* escape server-provided values before innerHTML rendering ([20c1245](https://github.com/AlteredCraft/chat-rag-explorer/commit/20c1245ed545031e9ec175c1fdeee0ecf328cc87)), closes [#27](https://github.com/AlteredCraft/chat-rag-explorer/issues/27)
+* warn at startup on unsupported LLM_PROVIDER and clarify provider docs ([1568bcb](https://github.com/AlteredCraft/chat-rag-explorer/commit/1568bcbd8f21e0fa3cbebe71c578919568071bee))
+
+
+### Documentation
+
+* correct doc/code mismatches and surface the shipped corpora ([3d0439a](https://github.com/AlteredCraft/chat-rag-explorer/commit/3d0439aceec3ec5bc8330bb61f48c56ad7be3f67))
+
 ## [0.3.0](https://github.com/AlteredCraft/chat-rag-explorer/compare/chat-rag-explorer-v0.2.1...chat-rag-explorer-v0.3.0) (2026-08-01)
 
 
