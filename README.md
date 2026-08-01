@@ -87,18 +87,75 @@ To confirm the key is genuinely working, watch that first reply arrive. The mode
 The repo ships with a pre-built vector database so you can see retrieval working immediately, without preparing any documents. It holds **429 chunks** drawn from 28 chapters of *The Morn Chronicles*, a Star Trek DS9 fan fiction. Deliberately obscure source material — the model has certainly never seen it, so anything it answers correctly had to come from retrieval rather than memory.
 
 1. Go to **Settings → RAG Settings**
-2. Choose **Local** mode and enter the path `data/chroma_db`
+2. Choose **Local** mode. The path dropdown scans `./data/` for databases — pick **📁 chroma_db**
 3. Click **Test Connection**, then select the `morn-chronicles-256chunk-50overlap` collection
-4. **Save Settings**, return to chat, and switch on the **RAG** toggle in the sidebar
+4. **Save Settings**, return to chat, and switch on **Enable RAG** in the sidebar
 5. Ask something only the source would know, such as *"How did Morn get his stool at Quark's bar?"*
 
 Now click **view details** on the answer. You'll see the retrieved chunks, their similarity scores, and the fully assembled prompt. Toggle RAG off and ask the same question again — the difference is the entire point of the exercise.
 
 Once that works, try a question the corpus *can't* answer and watch the similarity scores get worse. Retrieval always returns its best matches, even when the best available match is bad, and recognizing that failure mode is most of what separates a working RAG system from a confidently wrong one.
 
-> **First query is slow.** ChromaDB downloads its embedding model (~79 MB) the first time it embeds anything, then caches it in `~/.cache/chroma`. One-time delay; later queries are fast.
+> **‼️First query is slow.** ChromaDB downloads its embedding model (~79 MB) the first time it embeds anything, then caches it in `~/.cache/chroma`. One-time delay; later queries are fast.
 
 Full details in [docs/RAG.md](docs/RAG.md).
+
+## Try another corpus
+
+The Morn Chronicles is just the one that comes pre-built. `data/corpus/` ships with **seven** document sets in total, all openly licensed, all sitting there as plain markdown waiting to be turned into collections you can switch between.
+
+| Corpus | Files | What it is | Model already knows it? |
+|--------|-------|------------|-------------------------|
+| `morn_chronicles` | 28 | Star Trek DS9 fan fiction — the pre-built sample | No — invented for this project |
+| `autobio_elias_varn` | 20 | An invented 18th-century-style memoir | No — invented for this project |
+| `autobio_benjamin_franklin` | 20 | Franklin's autobiography (public domain) | Yes |
+| `paul-graham-essays` | 228 | Essays — by far the largest corpus here | Yes |
+| `dnd_srd-5.2` | 14 | D&D System Reference Document (CC BY) | Probably |
+| `wiki-voyage` | 33 | WikiVoyage city and country guides (CC BY-SA) | Probably |
+| `ai_engineer_open_textbooks` | 31 | Open textbook material on AI engineering (CC BY) | Partly |
+
+That last column is the reason to have more than one. The invented corpora **prove** retrieval — the model cannot possibly know Elias Varn, so a correct answer had to come from the documents. The familiar ones show you something harder and more realistic: what retrieval *changes* when the model already has opinions of its own, and how it behaves when the retrieved passage and its training data disagree.
+
+### Enabling one
+
+Takes about a minute.
+
+```bash
+% uv run utils/ingest.py
+```
+This interactive session will take you through chunking and then injesting the data into ChromaDb
+```bash
+==================================================
+Markdown Ingestion - Interactive Mode
+==================================================
+Press Enter to accept default values.
+
+Available corpus directories:
+  [1] ai_engineer_open_textbooks     (31 files, 532.5 KB)
+  [2] autobio_benjamin_franklin      (20 files, 349.1 KB)
+  [3] autobio_elias_varn             (22 files, 299.1 KB)
+  [4] dnd_srd-5.2                    (14 files, 1.5 MB)
+  [5] morn_chronicles                (31 files, 433.1 KB)
+  [6] paul-graham-essays             (228 files, 3.2 MB)
+  [7] wiki-voyage                    (33 files, 2.9 MB)
+  [8] Enter a custom path
+
+Enter a directory number:
+```
+
+The file counts here are every `.md` in the directory; files starting with `_` are reference material and get skipped at ingestion, which is why `morn_chronicles` lists 31 files but produced 28 chapters' worth of chunks.
+
+Pick a corpus from the numbered list, then press Enter twice to accept the default chunk size and overlap.
+
+1. The tool writes chunk previews to `data/chunks/<corpus>/` and **stops before touching the database**. Open one — it's plain markdown, every chunk labeled with its token count. Worth thirty seconds: seeing where the cuts actually land teaches more about chunking than any explanation.
+2. Press `[A]` to accept, then Enter to take the default collection name.
+3. Back in **Settings → RAG Settings**, click **Test Connection** again — that's what refreshes the collection list — then pick the new collection and **Save Settings**.
+
+The RAG toggle now searches that corpus. Every collection lives in the same database, so nothing is replaced and switching back is one dropdown change.
+
+> **Try the same corpus twice.** Collections are named `{corpus}-{chunk_size}chunk-{overlap}overlap`, so ingesting one at 256/50 and again at 512/100 leaves you two collections to compare on identical questions. Watching retrieval quality shift with nothing but the chunk boundaries changed is the most instructive experiment in this repo.
+
+Loading your **own** documents works exactly the same way, with a few more steps to prepare the files. [docs/RAG.md](docs/RAG.md#loading-your-own-documents) covers it, including the sharp edges.
 
 ## New to these ideas?
 
@@ -108,7 +165,7 @@ You don't need any of this up front — the app runs without it. Reach for these
 |---------|-------------------|------------|
 | Virtual environments | `uv sync`, the `.venv/` directory | [Python venv tutorial](https://docs.python.org/3/tutorial/venv.html) |
 | Flask, routes, blueprints | `chat_rag_explorer/routes.py` | [Flask quickstart](https://flask.palletsprojects.com/en/stable/quickstart/) |
-| Server-Sent Events (SSE) | How responses stream in token by token | [MDN: Using SSE](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events) |
+| Streaming HTTP responses | How replies arrive a word at a time | [MDN: Using readable streams](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API/Using_readable_streams) |
 | Tokens and context windows | The metrics sidebar, token counts | [OpenRouter docs](https://openrouter.ai/docs) |
 | Embeddings | Turning text into vectors for search | [Google ML Crash Course](https://developers.google.com/machine-learning/crash-course/embeddings) |
 | Vector databases | ChromaDB, collections, similarity | [Chroma docs](https://docs.trychroma.com/) |
@@ -147,7 +204,9 @@ Workshop attendees can also reach us at [info@alteredcraft.com](mailto:info@alte
 | Nothing in the model picker | Every ID in `.models_list` must exist upstream. Compare against [OpenRouter's catalog](https://openrouter.ai/models), or delete the file to show everything. Using Ollama? The file ships with OpenRouter IDs — see [Model Selection](#model-selection). |
 | "Could not reach ollama" | Ollama isn't running or the base URL is wrong. Start it with `ollama serve`, or check `OLLAMA_BASE_URL` in `.env`. |
 | First RAG query hangs | It's downloading the ~79 MB embedding model. Let it finish once. |
-| "No collections found" | Confirm the path is `data/chroma_db` and that the app has been started at least once — it creates that directory on first run. |
+| "No databases found" in the path dropdown | The dropdown lists `./data/*` directories containing a `chroma.sqlite3`. Start the app at least once — it creates `data/chroma_db` on first run. |
+| Newly ingested collection isn't in the list | The collection dropdown is populated by **Test Connection**. Click it again after ingesting. |
+| Re-ingested edited documents, nothing changed | Chunk IDs collide with the ones already stored and ChromaDB keeps the old text. Ingest under a new collection name. |
 
 ---
 
@@ -158,7 +217,7 @@ Deeper reference on architecture, testing, logging, and the release process.
 ## Features
 
 *   **Inspect Request Details**: See the exact payload sent to the model — parameters, token counts, timing, and retrieved RAG documents with source metadata and similarity scores
-*   **Real-time Streaming**: Server-Sent Events (SSE) stream responses token by token
+*   **Real-time Streaming**: replies arrive over a chunked HTTP response, read incrementally in the browser with the Streams API (`chat_rag_explorer/routes.py`, `static/script.js`)
 *   **Model Selection**: Model picker populated from the active provider (OpenRouter or Ollama), filtered by `.models_list`
 *   **Conversation History**: Multi-turn conversations with context retention
 *   **Metrics Sidebar**: Live session metrics including token usage
@@ -231,14 +290,12 @@ Ollama's model listing reports only IDs — no display names, context lengths, o
 
 ## Content Preparation
 
-To ingest your own documents, see [utils/README.md](utils/README.md):
+Two CLI tools prepare markdown for ingestion. Full reference in [utils/README.md](utils/README.md); the workflow and its sharp edges are in [docs/RAG.md](docs/RAG.md#loading-your-own-documents).
 
-- **split.py** — split a large markdown file into chapters by heading pattern
-- **ingest.py** — two-phase workflow: preview chunks → inspect → ingest to ChromaDB
+- **`utils/split.py`** — split one large markdown file into chapters by heading pattern
+- **`utils/ingest.py`** — preview chunks → inspect → ingest to ChromaDB
 
-The ingest tool writes human-readable chunk previews to `data/chunks/` so you can tune chunk size and overlap *before* committing anything to the vector database. Reading those previews is the fastest way to build intuition for what chunking actually does.
-
-`data/corpus/` also ships with several other public-domain and open corpora (Benjamin Franklin's autobiography, Paul Graham essays, D&D SRD, WikiVoyage, and more) if you want something larger to experiment with.
+Both write into `data/chroma_db`, the same database the app reads, so ingested collections appear alongside the shipped sample rather than replacing it.
 
 ## Architecture
 
@@ -253,9 +310,12 @@ chat-rag-explorer/
 │   ├── logging.py               # Centralized logging configuration
 │   ├── routes.py                # Web endpoints
 │   ├── services.py              # LLM integration logic
+│   ├── providers.py             # Provider seam (OpenRouter / Ollama)
 │   ├── rag_config_service.py    # ChromaDB connection management
 │   ├── prompt_service.py        # System prompt CRUD operations
-│   └── chat_history_service.py  # Conversation logging to JSONL
+│   ├── chat_history_service.py  # Conversation logging to JSONL
+│   ├── error_messages.py        # User-facing misconfiguration messages
+│   └── utils.py                 # Request IDs, API key masking
 ├── utils/                       # CLI utilities for content preparation
 │   ├── README.md                # Utility documentation
 │   ├── split.py                 # Split 1 page markdown into chapters
@@ -265,6 +325,7 @@ chat-rag-explorer/
 │   ├── chunks/                  # Chunk previews for inspection (gitignored)
 │   ├── chroma_db/               # Working ChromaDB databases (gitignored, auto-created)
 │   └── chroma_db_sample/        # Pristine sample DB (copied to chroma_db/ on startup)
+├── docs/                        # RAG reference, workshop prework
 ├── prompts/                     # System prompt templates (markdown)
 ├── logs/                        # Application logs (gitignored)
 ├── tests/                       # Test suite

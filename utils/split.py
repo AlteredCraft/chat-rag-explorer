@@ -5,21 +5,25 @@ Splits a single markdown file into multiple files based on heading patterns.
 Each output file gets YAML frontmatter with section metadata.
 
 Usage:
-    uv run lib/split.py input.md [--out DIR] [--pattern PATTERN] [--fm key:value ...]
+    uv run utils/split.py input.md [--out DIR] [--pattern PATTERN] [--fm key:value ...]
 
 Examples:
     # Split on ## headings (default)
-    uv run lib/split.py book.md
+    uv run utils/split.py book.md
 
     # Split on ### headings with custom output directory
-    uv run lib/split.py book.md --pattern "###" --out ./chapters/
+    uv run utils/split.py book.md --pattern "###" --out ./chapters/
 
     # Add custom frontmatter fields to all chapters
-    uv run lib/split.py book.md --fm title:"My Book" --fm author:"Jane Doe" --fm url:"https://example.com"
+    uv run utils/split.py book.md --fm title:"My Book" --fm author:"Jane Doe" --fm url:"https://example.com"
 
 Output:
     Creates numbered markdown files (01_chapter_name.md, 02_chapter_name.md, etc.)
     with frontmatter containing section_number, section_title, and any custom fields.
+
+    The default output directory is ./data/{filename}/, but ingest.py only offers
+    directories under data/corpus/ in its picker. Pass --out data/corpus/{name}
+    to stage chapters where ingestion will find them.
 """
 
 import argparse

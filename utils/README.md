@@ -32,9 +32,13 @@ The interactive workflow:
 2. **Set parameters** - Configure chunk size and overlap (tokens)
 3. **Preview chunks** - Chunks are written to `data/chunks/{corpus}/` for inspection
 4. **Review & decide**:
-   - `[A]` Accept - Ingest chunks to ChromaDB
+   - `[A]` Accept - Name the collection (default: `{corpus}-{chunk_size}chunk-{overlap}overlap`) and ingest to ChromaDB
    - `[R]` Re-run - Try different parameters (chunks are regenerated)
    - `[Q]` Quit - Keep chunks for later inspection
+
+Ingestion always writes to `data/chroma_db/`, the same database the app reads. New collections land alongside the sample rather than replacing it. Afterwards, click **Test Connection** in Settings → RAG Settings to refresh the collection list.
+
+> **Re-ingesting the same corpus is a no-op.** Chunk IDs are `{file_stem}_{chunk_index}`, and ChromaDB silently ignores an `add` for an ID it already stores — keeping the text it already has. Edit your sources and re-run with the same parameters, and the collection still serves the old content, with no warning. Use a new collection name whenever the sources change.
 
 ### Inspecting Chunks
 
@@ -75,6 +79,8 @@ uv run utils/ingest.py <directory> [collection_name] [--chunk-size N] [--overlap
 | `--chunk-size` | Maximum tokens per chunk | 256 |
 | `--overlap` | Token overlap between chunks | 50 |
 
+CLI mode skips the preview phase and ingests directly. ChromaDB requires collection names to be 3–512 characters from `[a-zA-Z0-9._-]`, starting and ending with an alphanumeric.
+
 ```bash
 # Auto-generated collection name: my-docs-256chunk-50overlap
 uv run utils/ingest.py ./data/corpus/my_docs
@@ -106,13 +112,15 @@ Each chunk stored in ChromaDB includes:
 ### Typical Workflow
 
 ```bash
-# 1. Split a large book into chapters
-uv run utils/split.py "My Book.md" --pattern "##" \
+# 1. Split a large book into chapters, straight into data/corpus/
+uv run utils/split.py "My Book.md" --out data/corpus/my_book --pattern "##" \
   --fm title:"My Book" --fm author:"Author Name"
 
 # 2. Ingest the chapters (interactive mode recommended)
 uv run utils/ingest.py
 ```
+
+Pass `--out` explicitly. `split.py` defaults to `./data/{filename}/`, but `ingest.py`'s corpus picker only lists directories under `data/corpus/`, so the default output won't appear as a choice.
 
 ## split.py
 

@@ -95,6 +95,7 @@ All endpoints defined in `chat_rag_explorer/routes.py`:
 | `/api/rag/validate-path` | POST | Validate local ChromaDB path exists |
 | `/api/rag/test-connection` | POST | Test connection, returns collection list |
 | `/api/rag/api-key-status` | GET | Check if `CHROMADB_API_KEY` is configured |
+| `/api/rag/discover-databases` | GET | Scan `./data/*` for ChromaDB directories (skips `chroma_db_sample`) |
 | `/api/rag/sample` | POST | Fetch sample records from a collection |
 
 ## Frontend
@@ -106,11 +107,11 @@ All endpoints defined in `chat_rag_explorer/routes.py`:
 The Settings page (`/settings#rag`) provides a wizard-style interface:
 
 1. **Step 1: Configure** - Select mode and enter connection details
-   - Local: Path input with validation
+   - Local: a dropdown of databases discovered under `./data/`, with a "Switch to manual entry" toggle for a path anywhere else
    - Server: Host and port inputs
    - Cloud: Tenant ID, database name, API key status
 
-2. **Step 2: Test Connection** - Validates config and retrieves collection list
+2. **Step 2: Test Connection** - Validates config and retrieves the collection list. This is the only thing that refreshes that list, so click it again after ingesting new content.
 
 3. **Step 3: Select Collection** - Choose collection + configure retrieval settings
    - Results Count slider (1-10)
@@ -134,7 +135,7 @@ The chat page includes:
 
 1. Navigate to Settings > RAG Settings tab (or click "RAG" link in chat sidebar)
 2. Select connection mode (local/server/cloud)
-3. Enter connection details
+3. Choose a discovered database, or enter connection details
 4. Click "Test Connection"
 5. Select a collection from dropdown
 6. Adjust retrieval settings (optional)
@@ -161,15 +162,87 @@ For local mode, the service validates:
 
 A pre-built ChromaDB with 429 chunks from "The Morn Chronicles" (a Star Trek DS9 fan fiction, 28 chapters) is included in the repository, in the collection `morn-chronicles-256chunk-50overlap`. On first startup, the app automatically copies the pristine sample from `data/chroma_db_sample/` to `data/chroma_db/` (which is gitignored) to prevent git deltas from ChromaDB's internal file mutations.
 
+That is the only *pre-built* collection, but not the only corpus available. `data/corpus/` holds seven markdown data sets ready to ingest — the README's [Try another corpus](../README.md#try-another-corpus) lists them and walks through enabling one.
+
 > **Point the app at `data/chroma_db`, never at `data/chroma_db_sample`.** ChromaDB writes to `chroma.sqlite3` even when it is only reading, so querying the sample directly dirties files that are committed to the repo. That is the whole reason the working copy exists.
 
 To use it:
 
 1. Go to Settings > RAG Settings
 2. Select "Local" mode
-3. Enter path: `data/chroma_db` (relative paths work)
+3. Pick `chroma_db` from the discovered-database dropdown (or switch to manual entry and type a path)
 4. Test connection and select the collection
 5. Save and enable RAG in chat
+
+## Loading Your Own Documents
+
+The sample collection has no privileged status. `data/chroma_db` is a plain ChromaDB directory, and `utils/ingest.py` writes into that same directory — so any new data set becomes a new *collection* sitting alongside `morn-chronicles-256chunk-50overlap`, selectable from the same dropdown. Nothing is replaced, and switching between them costs one dropdown change and a save.
+
+If you only want to try a different data set, the repo already ships seven corpora in `data/corpus/` and step 2 below is all you need — see [Try another corpus](../README.md#try-another-corpus) in the README. This section is for bringing in documents of your own.
+
+See [utils/README.md](../utils/README.md) for the full CLI reference.
+
+### 1. Stage the markdown
+
+Source documents live in `data/corpus/<name>/`, one directory per corpus. `find_markdown_files()` walks it recursively and skips any file whose name begins with `_` — that's how `morn_chronicles` keeps `_canon_bible.md` and `_chapter_outlines.md` next to the chapters without ingesting them.
+
+Only markdown is read. A single large file should be split first:
+
+```bash
+uv run utils/split.py "My Book.md" --out data/corpus/my_book --pattern "##"
+```
+
+`split.py` defaults its output to `data/<name>/`, **not** `data/corpus/<name>/`. Since `get_corpus_directories()` only lists `data/corpus/*`, output written to the default lands somewhere the ingest picker won't show. Pass `--out` and the problem disappears.
+
+YAML frontmatter is preserved. `split.py` emits `section_number` and `section_title`, plus anything you add with `--fm`, and every one of those fields is copied onto every chunk as ChromaDB metadata — which is what makes source attribution possible in the "view details" modal.
+
+### 2. Chunk, inspect, then commit
+
+```bash
+uv run utils/ingest.py
+```
+
+Interactive mode is two-phase by design. `create_chunks_to_files()` writes previews to `data/chunks/<corpus>/` (gitignored) and stops before touching the database:
+
+```
+data/chunks/my-book/
+├── manifest.json              # corpus name, source dir, params, totals
+├── 00_01_chapter_one.chunks.md
+└── 01_02_chapter_two.chunks.md
+```
+
+Each `.chunks.md` file is readable markdown — frontmatter with the parameters used, then every chunk with its token count. Read some. The `[R]` option re-chunks with different parameters, `[A]` calls `ingest_from_chunks()` to write them, `[Q]` leaves the previews in place.
+
+This inspect-before-you-commit loop is the tool's reason for existing. Chunk boundaries are the single most consequential decision in a RAG pipeline and the easiest one to get wrong invisibly — chunks that split a definition from its term, or a question from its answer, retrieve badly in ways no error message will ever tell you about.
+
+### 3. Understand the collection name
+
+`[A]` prompts for a collection name, defaulting to `{corpus}-{chunk_size}chunk-{overlap}overlap`. Parameters in the name are a deliberate convenience: ingest the same corpus twice with different settings and you get two collections that can be compared head to head on identical questions.
+
+ChromaDB constrains the name to 3–512 characters from `[a-zA-Z0-9._-]`, starting and ending alphanumeric. `sanitize_collection_name()` handles case and separators but does not enforce the length floor, so a very short corpus directory name can produce a name ChromaDB rejects.
+
+### 4. Wire it up
+
+Return to **Settings → RAG Settings** and click **Test Connection** again. `test_connection()` is what re-lists collections; the dropdown does not poll. Select the new collection, save, and enable RAG in chat.
+
+### Re-ingestion overwrites nothing
+
+`ingest_from_chunks()` builds each chunk ID as `{file_stem}_{chunk_index}` and calls `collection.add()`. ChromaDB silently ignores an `add` for an ID that already exists — no error, no warning, and the **previously stored text is kept**.
+
+The consequence: editing your source documents and re-running with the same parameters produces the same collection name and the same IDs, so the collection still serves the old content. The run reports success and appears to have done nothing.
+
+Ingest under a new collection name whenever the sources change. To reclaim the space, drop the stale one:
+
+```python
+import chromadb
+
+client = chromadb.PersistentClient(path="data/chroma_db")
+client.delete_collection("my-book-256chunk-50overlap")
+```
+
+### Deleting the working database
+
+`data/chroma_db` is gitignored, and `setup_sample_database()` in `main.py` only re-copies the sample when `data/chroma_db/chroma.sqlite3` is absent. Deleting the directory therefore restores the sample on next startup — and permanently discards every collection you ingested. The pristine sample in `data/chroma_db_sample/` is unaffected either way.
 
 ---
 
@@ -219,7 +292,7 @@ The `chroma.sqlite3` file is **shared across all collections** in that path. Thi
 
 ### How Ingestion Works
 
-The `utils/ingest.py` script (line 39, 535-536):
+`utils/ingest.py` hard-codes its destination — there is no environment variable or CLI flag for it:
 
 ```python
 RAG_DB_FILE_PATH = Path(__file__).parent.parent / "data" / "chroma_db"
@@ -228,7 +301,7 @@ client = PersistentClient(path=str(RAG_DB_FILE_PATH))
 collection = client.get_or_create_collection(name=collection_name)
 ```
 
-This creates or opens `data/chroma_db/chroma.sqlite3` and adds the new collection. The collection name follows the pattern `{corpus}-{chunk_size}chunk-{overlap}overlap` (e.g., `morn-chronicles-256chunk-50overlap`).
+This creates or opens `data/chroma_db/chroma.sqlite3` and adds the new collection. The collection name follows the pattern `{corpus}-{chunk_size}chunk-{overlap}overlap` (e.g., `morn-chronicles-256chunk-50overlap`). To build a database somewhere else, copy the directory afterwards and point the app at it via manual path entry.
 
 ### Listing All Collections
 

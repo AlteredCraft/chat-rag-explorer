@@ -503,10 +503,9 @@ def ingest_directory(
     """
     Ingest all markdown files from a directory into ChromaDB.
 
-    Client configuration is read from environment variables:
-        - CHROMA_CLIENT_TYPE: "persistent" (default) or "cloud"
-        - CHROMA_PERSIST_PATH: Local storage path (for persistent mode)
-        - CHROMA_TENANT, CHROMA_DATABASE, CHROMA_API_KEY: Cloud credentials
+    Always writes to the local database at RAG_DB_FILE_PATH (data/chroma_db),
+    which is the same database the app reads. New collections are added
+    alongside any that already exist there.
 
     Args:
         directory: Path to the directory containing markdown files
@@ -527,8 +526,8 @@ def ingest_directory(
     if not directory.exists():
         raise FileNotFoundError(f"Directory not found: {directory}")
 
-    # Get the ChromaDB client and collection (config from env vars)
-    # create RAG_DB_FILE_PATH if it doesn't exist
+    # Get the ChromaDB client and collection. PersistentClient creates the
+    # database directory itself, so we only need data/ to exist.
     RAG_DB_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     client = PersistentClient(path=str(RAG_DB_FILE_PATH))
     collection = client.get_or_create_collection(name=collection_name)
@@ -690,6 +689,11 @@ def ingest_from_chunks(
 
     This is the "accept" phase of the two-phase chunking workflow.
     Reads chunks from data/chunks/{corpus_name}/ and ingests to ChromaDB.
+
+    Chunk IDs are "{file_stem}_{chunk_index}". ChromaDB silently ignores an
+    add() for an ID it already holds, keeping the stored text, so re-ingesting
+    edited sources into an existing collection has no effect. Use a new
+    collection name when the sources change.
 
     Args:
         chunks_dir: Path to the chunks directory
