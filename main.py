@@ -24,6 +24,7 @@ from pathlib import Path
 
 from chat_rag_explorer import create_app, is_reloader_process
 from chat_rag_explorer.logging import setup_logging
+from chat_rag_explorer.providers import SUPPORTED_PROVIDERS
 from config import Config
 
 # Configure logging early so all startup functions can log properly
@@ -37,12 +38,21 @@ def validate_environment() -> None:
     Validate required environment configuration exists.
 
     Checks:
+    - LLM_PROVIDER names a supported provider
     - .env file exists in project root
-    - OPENROUTER_API_KEY is set and not empty
+    - OPENROUTER_API_KEY is set when OpenRouter is the active provider
+      (Ollama needs no key locally, so it is not checked)
 
     Logs warnings if validation fails but allows the app to start.
     The frontend will display appropriate messaging when API key is missing.
     """
+    if Config.LLM_PROVIDER not in SUPPORTED_PROVIDERS:
+        logger.warning("=" * 60)
+        logger.warning(f"LLM_PROVIDER is set to '{Config.LLM_PROVIDER}', which is not supported!")
+        logger.warning(f"Set LLM_PROVIDER in .env to one of: {', '.join(SUPPORTED_PROVIDERS)}")
+        logger.warning("API calls will fail until this is fixed.")
+        logger.warning("=" * 60)
+
     env_path = Path(__file__).parent / ".env"
 
     if not env_path.exists():
@@ -54,10 +64,11 @@ def validate_environment() -> None:
         logger.warning("  2. Add your OpenRouter API key to .env:")
         logger.warning("     OPENROUTER_API_KEY=your_api_key_here")
         logger.warning("Get an API key at: https://openrouter.ai/keys")
+        logger.warning("(Or run models locally: set LLM_PROVIDER=ollama - see README)")
         logger.warning("=" * 60)
         return
 
-    if not Config.OPENROUTER_API_KEY:
+    if Config.LLM_PROVIDER == "openrouter" and not Config.OPENROUTER_API_KEY:
         logger.warning("=" * 60)
         logger.warning("OPENROUTER_API_KEY is not set!")
         logger.warning("Add your OpenRouter API key to .env:")

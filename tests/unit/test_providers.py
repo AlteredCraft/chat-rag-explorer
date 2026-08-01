@@ -35,6 +35,37 @@ class TestGetActiveProvider:
 
         assert provider.api_key is None
 
+    def test_builds_ollama_from_config(self, app):
+        """LLM_PROVIDER=ollama selects Ollama connection settings."""
+        app.config["LLM_PROVIDER"] = "ollama"
+        app.config["OLLAMA_BASE_URL"] = "http://localhost:11434/v1"
+        app.config["OLLAMA_API_KEY"] = "ollama"
+
+        with app.app_context():
+            provider = get_active_provider()
+
+        assert provider.name == "ollama"
+        assert provider.base_url == "http://localhost:11434/v1"
+        assert provider.api_key == "ollama"
+
+    def test_ollama_placeholder_key_keeps_app_configured(self, app):
+        """The placeholder key is truthy, so is_configured() stays True locally."""
+        app.config["LLM_PROVIDER"] = "ollama"
+        app.config["OLLAMA_API_KEY"] = "ollama"
+
+        with app.app_context():
+            provider = get_active_provider()
+
+        assert bool(provider.api_key) is True
+
+    def test_unknown_llm_provider_raises(self, app):
+        """A typo in LLM_PROVIDER fails loudly with the valid options."""
+        app.config["LLM_PROVIDER"] = "nonsense"
+
+        with app.app_context():
+            with pytest.raises(ValueError, match="Unknown LLM_PROVIDER"):
+                get_active_provider()
+
 
 class TestListModels:
     """Tests for list_models() with mocked HTTP."""
@@ -72,4 +103,53 @@ class TestListModels:
         provider = Provider(name="nonsense", base_url="http://x", api_key=None)
 
         with pytest.raises(ValueError, match="Unknown provider"):
+            list_models(provider)
+
+
+class TestListOllamaModels:
+    """Tests for list_models() against Ollama's response shape."""
+
+    @patch("chat_rag_explorer.providers.requests.get")
+    def test_normalizes_to_frontend_contract(self, mock_get):
+        """Ollama entries gain name, context_length, and free pricing."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "object": "list",
+            "data": [
+                {"id": "llama3.2:3b", "object": "model", "owned_by": "library"},
+                {"id": "qwen3:8b", "object": "model", "owned_by": "library"},
+            ],
+        }
+        mock_get.return_value = mock_response
+        provider = Provider(name="ollama", base_url="http://localhost:11434/v1", api_key="ollama")
+
+        models = list_models(provider)
+
+        assert models == [
+            {"id": "llama3.2:3b", "name": "llama3.2:3b", "context_length": None, "pricing": {}},
+            {"id": "qwen3:8b", "name": "qwen3:8b", "context_length": None, "pricing": {}},
+        ]
+        assert mock_get.call_args.args[0] == "http://localhost:11434/v1/models"
+
+    @patch("chat_rag_explorer.providers.requests.get")
+    def test_entries_without_id_are_skipped(self, mock_get):
+        """A malformed catalog entry doesn't break the whole listing."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "data": [{"object": "model"}, {"id": "llama3.2:3b"}]
+        }
+        mock_get.return_value = mock_response
+        provider = Provider(name="ollama", base_url="http://localhost:11434/v1", api_key="ollama")
+
+        models = list_models(provider)
+
+        assert [m["id"] for m in models] == ["llama3.2:3b"]
+
+    @patch("chat_rag_explorer.providers.requests.get")
+    def test_connection_error_propagates(self, mock_get):
+        """Ollama not running raises so the route can explain the failure."""
+        mock_get.side_effect = requests.exceptions.ConnectionError("refused")
+        provider = Provider(name="ollama", base_url="http://localhost:11434/v1", api_key="ollama")
+
+        with pytest.raises(requests.exceptions.ConnectionError):
             list_models(provider)

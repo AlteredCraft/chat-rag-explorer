@@ -53,16 +53,24 @@ def _log_startup_config(app):
     logger.info("=" * 60)
 
     # Log environment/config (mask sensitive values)
-    api_key = app.config.get("OPENROUTER_API_KEY", "")
-    masked_key = mask_api_key(api_key)
+    provider_name = app.config.get("LLM_PROVIDER", "openrouter")
+    if provider_name == "ollama":
+        base_url = app.config.get("OLLAMA_BASE_URL", "NOT SET")
+        api_key = app.config.get("OLLAMA_API_KEY", "")
+        key_env_var = "OLLAMA_API_KEY"
+    else:
+        base_url = app.config.get("OPENROUTER_BASE_URL", "NOT SET")
+        api_key = app.config.get("OPENROUTER_API_KEY", "")
+        key_env_var = "OPENROUTER_API_KEY"
 
-    logger.info(f"Configuration:")
-    logger.info(f"  - OpenRouter Base URL: {app.config.get('OPENROUTER_BASE_URL', 'NOT SET')}")
-    logger.info(f"  - OpenRouter API Key: {masked_key}")
+    logger.info("Configuration:")
+    logger.info(f"  - LLM Provider: {provider_name}")
+    logger.info(f"  - Base URL: {base_url}")
+    logger.info(f"  - API Key: {mask_api_key(api_key)}")
     logger.info(f"  - Default Model: {app.config.get('DEFAULT_MODEL', 'NOT SET')}")
     logger.info(f"  - Debug Mode: {app.config.get('DEBUG', False)}")
 
-    logger.info(f"Logging Configuration:")
+    logger.info("Logging Configuration:")
     logger.info(f"  - App Log Level: {app.config.get('LOG_LEVEL_APP', 'DEBUG')}")
     logger.info(f"  - Deps Log Level: {app.config.get('LOG_LEVEL_DEPS', 'INFO')}")
     logger.info(f"  - Log to Stdout: {app.config.get('LOG_TO_STDOUT', True)}")
@@ -72,4 +80,4 @@ def _log_startup_config(app):
 
     # Warn about potential issues
     if not api_key:
-        logger.warning("OPENROUTER_API_KEY is not set - API calls will fail!")
+        logger.warning(f"{key_env_var} is not set - API calls will fail!")
