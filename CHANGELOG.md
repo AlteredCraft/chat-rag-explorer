@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/AlteredCraft/chat-rag-explorer/compare/chat-rag-explorer-v0.4.0...chat-rag-explorer-v0.5.0) (2026-08-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* OPENROUTER_API_KEY, OLLAMA_API_KEY, OPENROUTER_BASE_URL and OLLAMA_BASE_URL are no longer read. Rename them to LLM_API_KEY and LLM_BASE_URL; startup names the replacement for any that remain.
+* LLM_PROVIDER is now required. An existing .env without it will start but fail API calls until LLM_PROVIDER=openrouter (or ollama) is added. .env.example ships it in the REQUIRED section.
+
+### Features
+
+* collapse per-provider connection settings into LLM_API_KEY/LLM_BASE_URL ([ba194ca](https://github.com/AlteredCraft/chat-rag-explorer/commit/ba194cab9211b7e8c4e570c3a925cb87fe895305))
+* require LLM_PROVIDER instead of defaulting to openrouter ([7db83c9](https://github.com/AlteredCraft/chat-rag-explorer/commit/7db83c94d350a859d83c5a57d45742780574b689))
+
+
+### Bug Fixes
+
+* run renamed-settings check before the missing-.env early return ([d956cd2](https://github.com/AlteredCraft/chat-rag-explorer/commit/d956cd219df0849e3910b564fa25b2496ab792ac))
+
+
+### Documentation
+
+* restructure provider setup around the unified LLM_* settings ([a2e3ca8](https://github.com/AlteredCraft/chat-rag-explorer/commit/a2e3ca8aec1d9d82adca2b173b5d0b016e908920))
+
 ## [0.4.0](https://github.com/AlteredCraft/chat-rag-explorer/compare/chat-rag-explorer-v0.3.0...chat-rag-explorer-v0.4.0) (2026-08-01)
 
 
