@@ -37,17 +37,17 @@ class TestStartupConfigWarnings:
     def test_reports_missing_api_key_for_resolved_provider(self, app, caplog):
         """With a valid provider, the warning points at that provider's key."""
         app.config["LLM_PROVIDER"] = "openrouter"
-        app.config["OPENROUTER_API_KEY"] = ""
+        app.config["LLM_API_KEY"] = ""
 
         with caplog.at_level(logging.WARNING, logger="chat_rag_explorer"):
             _log_startup_config(app)
 
-        assert "OPENROUTER_API_KEY is not set" in caplog.text
+        assert "LLM_API_KEY is not set" in caplog.text
 
     def test_silent_when_fully_configured(self, app, caplog):
         """A correctly configured app logs no misconfiguration warning."""
         app.config["LLM_PROVIDER"] = "openrouter"
-        app.config["OPENROUTER_API_KEY"] = "sk-or-v1-key"
+        app.config["LLM_API_KEY"] = "sk-or-v1-key"
 
         with caplog.at_level(logging.WARNING, logger="chat_rag_explorer"):
             _log_startup_config(app)

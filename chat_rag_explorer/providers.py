@@ -5,9 +5,9 @@ Every supported provider speaks the OpenAI-compatible chat completions
 API, so the streaming path in services.py is provider-agnostic (the
 OpenAI SDK pointed at a base URL). What actually varies per provider:
 
-- Connection details: base URL and API key. A local Ollama needs no real
-  key, but the OpenAI SDK requires a non-empty string, so it uses the
-  placeholder value "ollama" (see config.py).
+- Connection details: base URL and API key. Users set these once as
+  LLM_BASE_URL and LLM_API_KEY; the per-provider fallbacks live in
+  PROVIDER_DEFAULTS below.
 - Model listing: the response schema differs per provider.
 
 list_models() implementations must normalize each model dict to include
@@ -18,9 +18,9 @@ at least the fields the frontend consumes:
 Supported providers are OpenRouter (LLM_PROVIDER=openrouter) and Ollama
 local or cloud (LLM_PROVIDER=ollama). LLM_PROVIDER is required and has
 no default, so an unset value is an error rather than a silent choice.
-Adding another provider means extending the switch in
-get_active_provider() and adding a _list_<provider>_models() function
-here - the chat streaming code does not change.
+Adding another provider means a new PROVIDER_DEFAULTS entry and a
+_list_<provider>_models() function here - the chat streaming code does
+not change.
 """
 import logging
 import time
@@ -32,9 +32,29 @@ from flask import current_app
 
 logger = logging.getLogger(__name__)
 
+# Per-provider connection defaults, used when LLM_BASE_URL / LLM_API_KEY
+# are not set. Defaulting per provider rather than globally means the
+# endpoint can never disagree with the selected provider - switching
+# LLM_PROVIDER to ollama with no LLM_BASE_URL lands on a local Ollama,
+# not on a stale OpenRouter URL.
+#
+# A local Ollama has no auth, but the OpenAI SDK requires a non-empty
+# key, so it gets a placeholder. OpenRouter genuinely needs a real key,
+# so it has none and an unset key reads as "not configured".
+PROVIDER_DEFAULTS = {
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_key": None,
+    },
+    "ollama": {
+        "base_url": "http://localhost:11434/v1",
+        "api_key": "ollama",
+    },
+}
+
 # Valid LLM_PROVIDER values. Startup validation (main.py) and the
-# selection switch below both check against this list.
-SUPPORTED_PROVIDERS = ("openrouter", "ollama")
+# lookup below both check against this list.
+SUPPORTED_PROVIDERS = tuple(PROVIDER_DEFAULTS)
 
 
 @dataclass(frozen=True)
@@ -49,9 +69,9 @@ class Provider:
 def get_active_provider():
     """Build the active provider from app config.
 
-    LLM_PROVIDER selects the provider; each branch reads that provider's
-    own connection settings. A local Ollama needs no real API key, so its
-    configured value defaults to a placeholder (see config.py).
+    LLM_PROVIDER selects the provider. LLM_BASE_URL and LLM_API_KEY apply
+    to whichever one is selected; each falls back to that provider's entry
+    in PROVIDER_DEFAULTS when unset.
 
     Returns:
         Provider for the currently configured LLM backend
@@ -69,23 +89,17 @@ def get_active_provider():
             f"{', '.join(SUPPORTED_PROVIDERS)}."
         )
 
-    if provider_name == "openrouter":
-        return Provider(
-            name="openrouter",
-            base_url=current_app.config["OPENROUTER_BASE_URL"],
-            api_key=current_app.config.get("OPENROUTER_API_KEY"),
+    defaults = PROVIDER_DEFAULTS.get(provider_name)
+    if defaults is None:
+        raise ValueError(
+            f"Unknown LLM_PROVIDER: '{provider_name}'. "
+            f"Set LLM_PROVIDER in your .env to one of: {', '.join(SUPPORTED_PROVIDERS)}."
         )
 
-    if provider_name == "ollama":
-        return Provider(
-            name="ollama",
-            base_url=current_app.config["OLLAMA_BASE_URL"],
-            api_key=current_app.config.get("OLLAMA_API_KEY"),
-        )
-
-    raise ValueError(
-        f"Unknown LLM_PROVIDER: '{provider_name}'. "
-        f"Set LLM_PROVIDER in your .env to one of: {', '.join(SUPPORTED_PROVIDERS)}."
+    return Provider(
+        name=provider_name,
+        base_url=current_app.config.get("LLM_BASE_URL") or defaults["base_url"],
+        api_key=current_app.config.get("LLM_API_KEY") or defaults["api_key"],
     )
 
 

@@ -1,9 +1,58 @@
 """
 Unit tests for main.py startup functions.
 
-Tests the sample database setup functionality that runs before the Flask app starts.
+Tests the sample database setup and the environment validation that run
+before the Flask app starts.
 """
+import logging
+import os
 import shutil
+from unittest.mock import patch
+
+# Imported at module scope on purpose. Importing main runs its startup
+# side effects, including setup_logging(), which clears every root
+# handler - caplog's included. Doing that inside a test body would strip
+# the handler mid-test and silently capture nothing.
+from main import validate_environment
+
+
+class TestRenamedSettingsWarning:
+    """Tests for the migration warning about collapsed provider settings.
+
+    An .env carried over from before the rename still sets the old names.
+    They are silently ignored, which is indistinguishable from the app
+    losing your key unless startup points it out.
+    """
+
+    def _validate(self, caplog, env):
+        with patch.dict(os.environ, env, clear=False):
+            with caplog.at_level(logging.WARNING, logger="chat_rag_explorer"):
+                validate_environment()
+        return caplog.text
+
+    def test_warns_about_legacy_api_key(self, caplog):
+        """A leftover OPENROUTER_API_KEY names its replacement."""
+        text = self._validate(caplog, {"OPENROUTER_API_KEY": "sk-or-v1-old"})
+
+        assert "OPENROUTER_API_KEY" in text
+        assert "LLM_API_KEY" in text
+
+    def test_warns_about_legacy_base_url(self, caplog):
+        """The same for the base URL settings."""
+        text = self._validate(caplog, {"OLLAMA_BASE_URL": "http://localhost:11434/v1"})
+
+        assert "OLLAMA_BASE_URL" in text
+        assert "LLM_BASE_URL" in text
+
+    def test_silent_when_no_legacy_settings(self, caplog):
+        """A clean .env produces no rename warning."""
+        env = {name: "" for name in
+               ("OPENROUTER_API_KEY", "OLLAMA_API_KEY", "OPENROUTER_BASE_URL", "OLLAMA_BASE_URL")}
+        env["LLM_API_KEY"] = "sk-or-v1-current"
+
+        text = self._validate(caplog, env)
+
+        assert "no longer used" not in text
 
 
 class TestSetupSampleDatabase:

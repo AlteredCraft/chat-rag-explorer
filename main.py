@@ -41,8 +41,10 @@ def validate_environment() -> None:
     - LLM_PROVIDER is set and names a supported provider (it is required
       and has no default, so "unset" is its own reported failure)
     - .env file exists in project root
-    - OPENROUTER_API_KEY is set when OpenRouter is the active provider
-      (Ollama needs no key locally, so it is not checked)
+    - LLM_API_KEY is set when OpenRouter is the active provider
+      (a local Ollama needs no key, so it is not checked)
+    - no renamed-away settings are left in .env, which would otherwise
+      look configured while being ignored
 
     Logs warnings if validation fails but allows the app to start.
     The frontend will display appropriate messaging when API key is missing.
@@ -70,19 +72,47 @@ def validate_environment() -> None:
         logger.warning("  1. Copy .env.example to .env:")
         logger.warning("     cp .env.example .env")
         logger.warning("  2. Add your OpenRouter API key to .env:")
-        logger.warning("     OPENROUTER_API_KEY=your_api_key_here")
+        logger.warning("     LLM_API_KEY=your_api_key_here")
         logger.warning("Get an API key at: https://openrouter.ai/keys")
         logger.warning("(Or run models locally: set LLM_PROVIDER=ollama - see README)")
         logger.warning("=" * 60)
         return
 
-    if Config.LLM_PROVIDER == "openrouter" and not Config.OPENROUTER_API_KEY:
+    _warn_about_renamed_settings()
+
+    if Config.LLM_PROVIDER == "openrouter" and not Config.LLM_API_KEY:
         logger.warning("=" * 60)
-        logger.warning("OPENROUTER_API_KEY is not set!")
+        logger.warning("LLM_API_KEY is not set!")
         logger.warning("Add your OpenRouter API key to .env:")
-        logger.warning("  OPENROUTER_API_KEY=your_api_key_here")
+        logger.warning("  LLM_API_KEY=your_api_key_here")
         logger.warning("Get an API key at: https://openrouter.ai/keys")
         logger.warning("=" * 60)
+
+
+# Settings that were collapsed into LLM_BASE_URL / LLM_API_KEY, mapped to
+# their replacement. An .env carried over from an earlier version still
+# has these, and they are now ignored - which looks exactly like the app
+# losing your key unless we say so.
+RENAMED_SETTINGS = {
+    "OPENROUTER_API_KEY": "LLM_API_KEY",
+    "OLLAMA_API_KEY": "LLM_API_KEY",
+    "OPENROUTER_BASE_URL": "LLM_BASE_URL",
+    "OLLAMA_BASE_URL": "LLM_BASE_URL",
+}
+
+
+def _warn_about_renamed_settings() -> None:
+    """Warn when .env still sets a variable that was renamed away."""
+    stale = [name for name in RENAMED_SETTINGS if os.getenv(name)]
+    if not stale:
+        return
+
+    logger.warning("=" * 60)
+    logger.warning("Your .env sets settings that are no longer used:")
+    for name in stale:
+        logger.warning(f"  {name} -> renamed to {RENAMED_SETTINGS[name]}")
+    logger.warning("These are ignored. Rename them so your settings take effect.")
+    logger.warning("=" * 60)
 
 
 def setup_sample_database() -> None:

@@ -56,10 +56,12 @@ Open `.env` and set your provider and key:
 
 ```env
 LLM_PROVIDER=openrouter
-OPENROUTER_API_KEY=sk-or-v1-your-key-here
+LLM_API_KEY=sk-or-v1-your-key-here
 ```
 
 Both are required — `LLM_PROVIDER` has no default, so the app asks you to choose rather than assuming. `.env.example` ships with `openrouter` already filled in, so in practice you only edit the key.
+
+The key setting is `LLM_API_KEY`, not a provider-specific name: it holds the key for whichever provider `LLM_PROVIDER` selects. Switching providers changes those two lines and nothing else.
 
 `.env` is gitignored, so your key will not be committed. Every other setting in that file is optional and already has a sensible default.
 
@@ -205,8 +207,9 @@ Workshop attendees can also reach us at [info@alteredcraft.com](mailto:info@alte
 | `402` / insufficient credits | The key is valid but the account is out of funds. [Add credit](https://openrouter.ai/settings/credits) or switch to a free model. |
 | Key set but still unauthorized | `.env` is read at startup only. Stop the app with `Ctrl+C` and start it again. |
 | "LLM_PROVIDER is not set" | It's required and has no default. Add `LLM_PROVIDER=openrouter` (or `ollama`) to `.env` and restart. An `.env` copied from an older `.env.example` won't have it. |
+| Startup says settings are "no longer used" | `OPENROUTER_*`/`OLLAMA_*` keys and URLs were collapsed into `LLM_API_KEY` and `LLM_BASE_URL`. Rename them in `.env`; the old names are ignored. |
 | Nothing in the model picker | Every ID in `.models_list` must exist upstream. Compare against [OpenRouter's catalog](https://openrouter.ai/models), or delete the file to show everything. Using Ollama? The file ships with OpenRouter IDs — see [Model Selection](#model-selection). |
-| "Could not reach ollama" | Ollama isn't running or the base URL is wrong. Start it with `ollama serve`, or check `OLLAMA_BASE_URL` in `.env`. |
+| "Could not reach ollama" | Ollama isn't running or the base URL is wrong. Start it with `ollama serve`, or check `LLM_BASE_URL` in `.env`. |
 | First RAG query hangs | It's downloading the ~79 MB embedding model. Let it finish once. |
 | "No databases found" in the path dropdown | The dropdown lists `./data/*` directories containing a `chroma.sqlite3`. Start the app at least once — it creates `data/chroma_db` on first run. |
 | Newly ingested collection isn't in the list | The collection dropdown is populated by **Test Connection**. Click it again after ingesting. |
@@ -265,17 +268,18 @@ Everything the app sends to a model goes through the OpenAI-compatible chat comp
 
 1. [Install Ollama](https://ollama.com/download) and pull a model, e.g. `ollama pull llama3.2:3b`
 2. Make sure it's running (`ollama serve` if it isn't already)
-3. In `.env`, select the provider and a default model you've pulled:
+3. In `.env`, select the provider and a default model you've pulled, and clear the key:
 
 ```env
 LLM_PROVIDER=ollama
+LLM_API_KEY=
 DEFAULT_MODEL=llama3.2:3b
 ```
 
 4. Make the model selectable: add its name to `.models_list`, or delete that file to show everything Ollama offers (see [Model Selection](#model-selection))
 5. Restart the app
 
-No API key is involved — the app fills in a placeholder because the OpenAI SDK insists on one, and Ollama ignores it.
+You don't need `LLM_BASE_URL` — with `LLM_PROVIDER=ollama` it defaults to `http://localhost:11434/v1`. No API key is involved either; the app fills in a placeholder because the OpenAI SDK insists on one, and Ollama ignores it.
 
 ### Ollama cloud
 
@@ -283,8 +287,8 @@ Same as above, plus point the base URL at the cloud endpoint and set your [Ollam
 
 ```env
 LLM_PROVIDER=ollama
-OLLAMA_BASE_URL=https://ollama.com/v1
-OLLAMA_API_KEY=your-ollama-key-here
+LLM_BASE_URL=https://ollama.com/v1
+LLM_API_KEY=your-ollama-key-here
 DEFAULT_MODEL=gpt-oss:120b
 ```
 
@@ -349,16 +353,19 @@ chat-rag-explorer/
 
 ## Configuration
 
-All settings live in `.env` (copied from `.env.example`). Two are required: `LLM_PROVIDER`, and — with OpenRouter — `OPENROUTER_API_KEY`. A local [Ollama](#using-ollama-instead-of-openrouter) needs no key at all; Ollama cloud needs `OLLAMA_API_KEY`.
+All settings live in `.env` (copied from `.env.example`). Two are required: `LLM_PROVIDER`, and — unless you're on a local Ollama — `LLM_API_KEY`.
+
+Connection settings are **provider-agnostic**. There is one `LLM_API_KEY` and one `LLM_BASE_URL`, applying to whichever provider `LLM_PROVIDER` selects, rather than an `OPENROUTER_*` and `OLLAMA_*` pair each. Switching providers therefore can't leave a stale setting from the other one shadowing your change.
 
 `LLM_PROVIDER` deliberately has no default in code. Defaulting it would let someone who never made the choice end up on OpenRouter and then be puzzled by the API key errors, so the app reports an unset value at startup and in the UI instead.
+
+`LLM_BASE_URL` does have a default, but a *per-provider* one — `openrouter` resolves to OpenRouter's endpoint, `ollama` to `http://localhost:11434/v1`. Set it only to reach somewhere else, such as Ollama cloud. Because the fallback follows the provider, the endpoint can never disagree with your provider choice.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `LLM_PROVIDER` | — | **Required.** Which provider serves chat: `openrouter` or `ollama` |
-| `OPENROUTER_API_KEY` | — | **Required** with OpenRouter. Your OpenRouter key |
-| `OLLAMA_BASE_URL` | `http://localhost:11434/v1` | Ollama endpoint; `https://ollama.com/v1` for cloud |
-| `OLLAMA_API_KEY` | `ollama` (placeholder) | Only needed for Ollama cloud |
+| `LLM_API_KEY` | — | **Required** except on a local Ollama. Key for the selected provider |
+| `LLM_BASE_URL` | per provider (see above) | Endpoint for the selected provider; set for Ollama cloud |
 | `CHROMADB_API_KEY` | — | Only for ChromaDB cloud mode |
 | `SERVER_HOST` | `127.0.0.1` | Bind address |
 | `SERVER_PORT` | `8000` | Starting port |

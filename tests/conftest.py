@@ -12,7 +12,7 @@ import pytest
 # Set test environment before importing app. LLM_PROVIDER is required
 # and has no default, so the fixture models a correctly configured app;
 # tests that need the unset state override it on app.config directly.
-os.environ["OPENROUTER_API_KEY"] = "test-api-key-for-testing"
+os.environ["LLM_API_KEY"] = "test-api-key-for-testing"
 os.environ.setdefault("LLM_PROVIDER", "openrouter")
 
 
@@ -24,7 +24,7 @@ def app():
     app = create_app()
     app.config.update({
         "TESTING": True,
-        "OPENROUTER_API_KEY": "test-api-key-for-testing",
+        "LLM_API_KEY": "test-api-key-for-testing",
         "LLM_PROVIDER": "openrouter",
     })
     yield app

@@ -16,8 +16,8 @@ class TestGetActiveProvider:
 
     def test_builds_openrouter_from_config(self, app):
         """Provider carries the configured base URL and API key."""
-        app.config["OPENROUTER_BASE_URL"] = "https://example.test/v1"
-        app.config["OPENROUTER_API_KEY"] = "test-key"
+        app.config["LLM_BASE_URL"] = "https://example.test/v1"
+        app.config["LLM_API_KEY"] = "test-key"
 
         with app.app_context():
             provider = get_active_provider()
@@ -28,7 +28,7 @@ class TestGetActiveProvider:
 
     def test_missing_api_key_is_none(self, app):
         """Provider api_key is None when unset (app can still start)."""
-        app.config["OPENROUTER_API_KEY"] = None
+        app.config["LLM_API_KEY"] = None
 
         with app.app_context():
             provider = get_active_provider()
@@ -38,8 +38,8 @@ class TestGetActiveProvider:
     def test_builds_ollama_from_config(self, app):
         """LLM_PROVIDER=ollama selects Ollama connection settings."""
         app.config["LLM_PROVIDER"] = "ollama"
-        app.config["OLLAMA_BASE_URL"] = "http://localhost:11434/v1"
-        app.config["OLLAMA_API_KEY"] = "ollama"
+        app.config["LLM_BASE_URL"] = "http://localhost:11434/v1"
+        app.config["LLM_API_KEY"] = "ollama"
 
         with app.app_context():
             provider = get_active_provider()
@@ -51,12 +51,82 @@ class TestGetActiveProvider:
     def test_ollama_placeholder_key_keeps_app_configured(self, app):
         """The placeholder key is truthy, so is_configured() stays True locally."""
         app.config["LLM_PROVIDER"] = "ollama"
-        app.config["OLLAMA_API_KEY"] = "ollama"
+        app.config["LLM_API_KEY"] = "ollama"
 
         with app.app_context():
             provider = get_active_provider()
 
         assert bool(provider.api_key) is True
+
+
+class TestProviderConnectionDefaults:
+    """LLM_BASE_URL and LLM_API_KEY fall back per provider, not globally.
+
+    A single shared default is impossible (the providers sit at different
+    endpoints), and no default at all would let someone switch
+    LLM_PROVIDER to ollama while a stale LLM_BASE_URL still points at
+    OpenRouter. Defaulting per provider cannot mismatch.
+    """
+
+    def test_openrouter_base_url_defaults_to_openrouter(self, app):
+        """Unset LLM_BASE_URL resolves to OpenRouter's endpoint."""
+        app.config["LLM_PROVIDER"] = "openrouter"
+        app.config["LLM_BASE_URL"] = ""
+
+        with app.app_context():
+            provider = get_active_provider()
+
+        assert provider.base_url == "https://openrouter.ai/api/v1"
+
+    def test_ollama_base_url_defaults_to_localhost(self, app):
+        """The same unset value resolves to a local Ollama instead."""
+        app.config["LLM_PROVIDER"] = "ollama"
+        app.config["LLM_BASE_URL"] = ""
+
+        with app.app_context():
+            provider = get_active_provider()
+
+        assert provider.base_url == "http://localhost:11434/v1"
+
+    def test_explicit_base_url_overrides_the_default(self, app):
+        """Ollama cloud is reached by setting LLM_BASE_URL."""
+        app.config["LLM_PROVIDER"] = "ollama"
+        app.config["LLM_BASE_URL"] = "https://ollama.com/v1"
+
+        with app.app_context():
+            provider = get_active_provider()
+
+        assert provider.base_url == "https://ollama.com/v1"
+
+    def test_ollama_api_key_defaults_to_placeholder(self, app):
+        """A local Ollama needs no key, but the OpenAI SDK demands a non-empty one."""
+        app.config["LLM_PROVIDER"] = "ollama"
+        app.config["LLM_API_KEY"] = None
+
+        with app.app_context():
+            provider = get_active_provider()
+
+        assert provider.api_key == "ollama"
+
+    def test_openrouter_api_key_has_no_placeholder(self, app):
+        """OpenRouter genuinely needs a key, so unset stays unset."""
+        app.config["LLM_PROVIDER"] = "openrouter"
+        app.config["LLM_API_KEY"] = None
+
+        with app.app_context():
+            provider = get_active_provider()
+
+        assert provider.api_key is None
+
+    def test_explicit_api_key_overrides_the_placeholder(self, app):
+        """Ollama cloud's real key wins over the local placeholder."""
+        app.config["LLM_PROVIDER"] = "ollama"
+        app.config["LLM_API_KEY"] = "real-cloud-key"
+
+        with app.app_context():
+            provider = get_active_provider()
+
+        assert provider.api_key == "real-cloud-key"
 
     def test_unknown_llm_provider_raises(self, app):
         """A typo in LLM_PROVIDER fails loudly with the valid options."""

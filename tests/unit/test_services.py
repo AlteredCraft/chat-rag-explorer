@@ -196,13 +196,13 @@ class TestChatStream:
         assert len(events) == 1
         kind, message = events[0]
         assert kind == "error"
-        assert "OPENROUTER_API_KEY" in message
+        assert "LLM_API_KEY" in message
 
     def test_client_creation_failure_yields_error_event(self, app_context):
         """A client that cannot be built yields an error event instead of raising."""
         from chat_rag_explorer.services import ChatService
 
-        app_context.config["OPENROUTER_API_KEY"] = None
+        app_context.config["LLM_API_KEY"] = None
         service = ChatService()
 
         events = list(service.chat_stream([{"role": "user", "content": "hi"}], model="m"))
@@ -288,39 +288,39 @@ class TestChatServiceIsConfigured:
     """Tests for ChatService.is_configured method."""
 
     def test_returns_true_when_api_key_set(self, app_context):
-        """Returns True when OPENROUTER_API_KEY is configured."""
+        """Returns True when LLM_API_KEY is configured."""
         from chat_rag_explorer.services import ChatService
 
-        app_context.config["OPENROUTER_API_KEY"] = "sk-valid-api-key-12345"
+        app_context.config["LLM_API_KEY"] = "sk-valid-api-key-12345"
         service = ChatService()
 
         assert service.is_configured() is True
 
     def test_returns_false_when_api_key_empty(self, app_context):
-        """Returns False when OPENROUTER_API_KEY is empty string."""
+        """Returns False when LLM_API_KEY is empty string."""
         from chat_rag_explorer.services import ChatService
 
-        app_context.config["OPENROUTER_API_KEY"] = ""
+        app_context.config["LLM_API_KEY"] = ""
         service = ChatService()
 
         assert service.is_configured() is False
 
     def test_returns_false_when_api_key_none(self, app_context):
-        """Returns False when OPENROUTER_API_KEY is None."""
+        """Returns False when LLM_API_KEY is None."""
         from chat_rag_explorer.services import ChatService
 
-        app_context.config["OPENROUTER_API_KEY"] = None
+        app_context.config["LLM_API_KEY"] = None
         service = ChatService()
 
         assert service.is_configured() is False
 
     def test_returns_false_when_api_key_missing(self, app_context):
-        """Returns False when OPENROUTER_API_KEY key is missing entirely."""
+        """Returns False when LLM_API_KEY is missing entirely."""
         from chat_rag_explorer.services import ChatService
 
         # Remove the key from config
-        if "OPENROUTER_API_KEY" in app_context.config:
-            del app_context.config["OPENROUTER_API_KEY"]
+        if "LLM_API_KEY" in app_context.config:
+            del app_context.config["LLM_API_KEY"]
         service = ChatService()
 
         assert service.is_configured() is False

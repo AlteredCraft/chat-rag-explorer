@@ -52,24 +52,24 @@ def _log_startup_config(app):
     logger.info("RAG Lab - Starting up")
     logger.info("=" * 60)
 
-    # Log environment/config (mask sensitive values). LLM_PROVIDER has no
-    # default, so an unset value is reported as such rather than shown as
-    # whichever provider's settings we happened to read.
+    # Log environment/config (mask sensitive values). Resolving through
+    # the provider seam means the banner reports the base URL and key the
+    # app will actually use, including the per-provider defaults. A
+    # provider that does not resolve is reported as such rather than
+    # shown as whichever settings we happened to read.
+    from chat_rag_explorer.providers import get_active_provider
+
     provider_name = app.config.get("LLM_PROVIDER")
-    if provider_name == "ollama":
-        base_url = app.config.get("OLLAMA_BASE_URL", "NOT SET")
-        api_key = app.config.get("OLLAMA_API_KEY", "")
-        key_env_var = "OLLAMA_API_KEY"
-    elif provider_name == "openrouter":
-        base_url = app.config.get("OPENROUTER_BASE_URL", "NOT SET")
-        api_key = app.config.get("OPENROUTER_API_KEY", "")
-        key_env_var = "OPENROUTER_API_KEY"
-    else:
+    try:
+        with app.app_context():
+            provider = get_active_provider()
+        base_url = provider.base_url
+        api_key = provider.api_key or ""
+        provider_error = None
+    except ValueError as e:
         base_url = "NOT SET"
         api_key = ""
-        # No provider resolved, so no API key setting to point at - the
-        # provider selection itself is what needs fixing.
-        key_env_var = None
+        provider_error = str(e)
 
     logger.info("Configuration:")
     logger.info(f"  - LLM Provider: {provider_name or 'NOT SET'}")
@@ -87,8 +87,8 @@ def _log_startup_config(app):
         logger.info(f"  - Log File Path: {app.config.get('LOG_FILE_PATH', 'app.log')}")
 
     # Warn about potential issues
-    if key_env_var is None:
+    if provider_error:
         problem = "is not set" if not provider_name else f"is not supported: '{provider_name}'"
         logger.warning(f"LLM_PROVIDER {problem} - API calls will fail!")
     elif not api_key:
-        logger.warning(f"{key_env_var} is not set - API calls will fail!")
+        logger.warning("LLM_API_KEY is not set - API calls will fail!")

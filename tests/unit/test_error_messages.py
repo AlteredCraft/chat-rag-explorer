@@ -50,17 +50,21 @@ class TestMissingApiKeyMessage:
         message = missing_api_key_message(PROVIDER)
 
         assert "openrouter" in message
-        assert "OPENROUTER_API_KEY" in message
+        assert "LLM_API_KEY" in message
         assert ".env" in message
 
-    def test_unknown_provider_falls_back_to_generic_wording(self):
-        """A provider without an env-var mapping still gets a usable message."""
+    def test_any_provider_gets_the_same_unified_setting(self):
+        """The key setting no longer varies by provider, so none can be unmapped.
+
+        This used to need a per-provider lookup with a generic fallback;
+        collapsing to LLM_API_KEY removes that whole class of gap.
+        """
         provider = Provider(name="someprovider", base_url="http://x", api_key=None)
 
         message = missing_api_key_message(provider)
 
         assert "someprovider" in message
-        assert "provider API key" in message
+        assert "LLM_API_KEY" in message
 
 
 class TestDescribeChatError:
@@ -75,14 +79,14 @@ class TestDescribeChatError:
         message = describe_chat_error(exc, PROVIDER)
 
         assert PROVIDER.base_url in message
-        assert "OPENROUTER_BASE_URL" in message
+        assert "LLM_BASE_URL" in message
 
     def test_401_names_api_key_env_var(self):
         """An auth failure points at the API key setting."""
         message = describe_chat_error(_openai_status_error(401), PROVIDER)
 
         assert "401" in message
-        assert "OPENROUTER_API_KEY" in message
+        assert "LLM_API_KEY" in message
 
     def test_402_mentions_credits(self):
         """Insufficient credits explains how to proceed."""
@@ -117,15 +121,15 @@ class TestDescribeChatError:
 
         message = describe_chat_error(exc, OLLAMA_PROVIDER)
 
-        assert "OLLAMA_BASE_URL" in message
+        assert "LLM_BASE_URL" in message
         assert "ollama serve" in message
 
     def test_ollama_401_names_api_key_env_var(self):
-        """Ollama cloud rejecting a key points at OLLAMA_API_KEY."""
+        """Ollama cloud rejecting a key points at LLM_API_KEY."""
         message = describe_chat_error(_openai_status_error(401), OLLAMA_PROVIDER)
 
         assert "401" in message
-        assert "OLLAMA_API_KEY" in message
+        assert "LLM_API_KEY" in message
 
 
 class TestDescribeModelListError:
@@ -138,7 +142,7 @@ class TestDescribeModelListError:
         message = describe_model_list_error(exc, PROVIDER)
 
         assert PROVIDER.base_url in message
-        assert "OPENROUTER_BASE_URL" in message
+        assert "LLM_BASE_URL" in message
 
     def test_timeout_names_base_url(self):
         """Timeouts get the same connection guidance."""
@@ -146,14 +150,14 @@ class TestDescribeModelListError:
 
         message = describe_model_list_error(exc, PROVIDER)
 
-        assert "OPENROUTER_BASE_URL" in message
+        assert "LLM_BASE_URL" in message
 
     def test_401_names_api_key_env_var(self):
         """An auth failure points at the API key setting."""
         message = describe_model_list_error(_requests_http_error(401), PROVIDER)
 
         assert "401" in message
-        assert "OPENROUTER_API_KEY" in message
+        assert "LLM_API_KEY" in message
 
     def test_unrecognized_error_includes_raw_message(self):
         """Errors without a misconfiguration story keep the raw detail."""
@@ -168,5 +172,5 @@ class TestDescribeModelListError:
 
         message = describe_model_list_error(exc, OLLAMA_PROVIDER)
 
-        assert "OLLAMA_BASE_URL" in message
+        assert "LLM_BASE_URL" in message
         assert "ollama serve" in message

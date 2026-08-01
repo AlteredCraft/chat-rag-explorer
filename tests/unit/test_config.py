@@ -139,22 +139,25 @@ class TestConfig:
 
             assert config.Config.CHAT_HISTORY_ENABLED is False
 
-    def test_openrouter_base_url_default(self):
-        """OPENROUTER_BASE_URL defaults to the OpenRouter endpoint."""
-        import importlib
-        import config
-        importlib.reload(config)
-
-        assert config.Config.OPENROUTER_BASE_URL == "https://openrouter.ai/api/v1"
-
-    def test_openrouter_base_url_env_override(self):
-        """Base URL can point at any OpenAI-compatible endpoint (e.g. Ollama)."""
+    def test_llm_base_url_is_empty_when_unset(self):
+        """Config holds no endpoint default; providers.py supplies one per provider."""
         import importlib
         import config
         try:
-            with patch.dict(os.environ, {"OPENROUTER_BASE_URL": "http://localhost:11434/v1"}, clear=True):
+            with patch.dict(os.environ, {}, clear=True):
                 importlib.reload(config)
-                assert config.Config.OPENROUTER_BASE_URL == "http://localhost:11434/v1"
+                assert config.Config.LLM_BASE_URL == ""
+        finally:
+            importlib.reload(config)
+
+    def test_llm_base_url_env_override(self):
+        """Base URL can point at any OpenAI-compatible endpoint."""
+        import importlib
+        import config
+        try:
+            with patch.dict(os.environ, {"LLM_BASE_URL": "http://localhost:11434/v1"}, clear=True):
+                importlib.reload(config)
+                assert config.Config.LLM_BASE_URL == "http://localhost:11434/v1"
         finally:
             # Reload with the real environment so later tests see real values
             importlib.reload(config)
@@ -197,14 +200,31 @@ class TestConfig:
         finally:
             importlib.reload(config)
 
-    def test_ollama_defaults_to_local_with_placeholder_key(self):
-        """Ollama defaults target a local install and need no real key."""
+    def test_llm_api_key_has_no_default(self):
+        """No placeholder in config; the per-provider fallback lives in providers.py."""
         import importlib
         import config
         try:
             with patch.dict(os.environ, {}, clear=True):
                 importlib.reload(config)
-                assert config.Config.OLLAMA_BASE_URL == "http://localhost:11434/v1"
-                assert config.Config.OLLAMA_API_KEY == "ollama"
+                assert config.Config.LLM_API_KEY is None
         finally:
             importlib.reload(config)
+
+    def test_legacy_provider_specific_settings_are_gone(self):
+        """The per-provider variables were collapsed into LLM_BASE_URL/LLM_API_KEY.
+
+        Guards against a partial revert leaving a second source of truth
+        that silently shadows the unified setting.
+        """
+        import importlib
+        import config
+        importlib.reload(config)
+
+        for legacy in (
+            "OPENROUTER_API_KEY",
+            "OPENROUTER_BASE_URL",
+            "OLLAMA_API_KEY",
+            "OLLAMA_BASE_URL",
+        ):
+            assert not hasattr(config.Config, legacy)

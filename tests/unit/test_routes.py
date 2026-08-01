@@ -767,7 +767,7 @@ class TestChatApiKeyGuard:
         })
 
         assert response.status_code == 503
-        assert "OPENROUTER_API_KEY" in response.get_json()["error"]
+        assert "LLM_API_KEY" in response.get_json()["error"]
         mock_chat.chat_stream.assert_not_called()
 
 
@@ -782,7 +782,7 @@ class TestGetModelsErrors:
         response = client.get("/api/models")
 
         assert response.status_code == 502
-        assert "OPENROUTER_BASE_URL" in response.get_json()["error"]
+        assert "LLM_BASE_URL" in response.get_json()["error"]
 
     @patch("chat_rag_explorer.routes.chat_service")
     def test_generic_failure_keeps_raw_detail(self, mock_chat, client):

@@ -7,17 +7,18 @@ failure states a user can actually fix - a bad API key, a wrong base
 URL, an unreachable service, a missing model - into plain-language
 messages that say what went wrong and where to fix it.
 
-The env-var maps are keyed by provider name so adding a provider only
-needs new entries here, alongside the new branch in
-providers.get_active_provider().
+Connection settings are provider-agnostic (LLM_BASE_URL, LLM_API_KEY),
+so these messages name the same variables whatever the active provider
+is, and adding a provider needs nothing here.
 """
 import openai
 import requests
 
-# Where each provider's connection settings live in .env - used to point
-# the user at the exact setting to fix.
-API_KEY_ENV_VARS = {"openrouter": "OPENROUTER_API_KEY", "ollama": "OLLAMA_API_KEY"}
-BASE_URL_ENV_VARS = {"openrouter": "OPENROUTER_BASE_URL", "ollama": "OLLAMA_BASE_URL"}
+# Where connection settings live in .env - used to point the user at the
+# exact setting to fix. Provider-agnostic, so there is no per-provider
+# lookup to keep in sync (and no unmapped provider to fall back for).
+API_KEY_ENV_VAR = "LLM_API_KEY"
+BASE_URL_ENV_VAR = "LLM_BASE_URL"
 
 
 def missing_api_key_message(provider):
@@ -29,10 +30,9 @@ def missing_api_key_message(provider):
     Returns:
         Actionable message naming the .env variable to set
     """
-    env_var = API_KEY_ENV_VARS.get(provider.name, "the provider API key")
     return (
         f"No API key is configured for {provider.name}. "
-        f"Set {env_var} in your .env file and restart the app."
+        f"Set {API_KEY_ENV_VAR} in your .env file and restart the app."
     )
 
 
@@ -80,10 +80,9 @@ def describe_model_list_error(exc, provider):
 
 def _connection_message(provider):
     """Message for connection failures (wrong base URL, service down)."""
-    env_var = BASE_URL_ENV_VARS.get(provider.name, "the provider base URL")
     message = (
         f"Could not reach {provider.name} at {provider.base_url}. "
-        f"Check {env_var} in your .env file and that the service is reachable."
+        f"Check {BASE_URL_ENV_VAR} in your .env file and that the service is reachable."
     )
     if provider.name == "ollama":
         message += " Is Ollama running? Start it with 'ollama serve'."
@@ -96,12 +95,10 @@ def _describe_by_status(status, provider, model=None):
     Returns None for statuses without a specific misconfiguration story,
     so callers can fall back to the raw error.
     """
-    key_env_var = API_KEY_ENV_VARS.get(provider.name, "the provider API key")
-
     if status == 401:
         return (
             f"{provider.name} rejected the API key (HTTP 401). "
-            f"Check that {key_env_var} in your .env file is a valid, active key."
+            f"Check that {API_KEY_ENV_VAR} in your .env file is a valid, active key."
         )
     if status == 402:
         return (

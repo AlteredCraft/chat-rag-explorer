@@ -5,7 +5,8 @@ All settings can be customized via a .env file in the project root.
 See .env.example for available options and their defaults.
 
 Configuration Groups:
-- LLM Provider: provider selection (OpenRouter or Ollama) and connection settings
+- LLM Provider: provider selection (LLM_PROVIDER) plus the provider-agnostic
+  connection settings LLM_BASE_URL and LLM_API_KEY
 - ChromaDB: Vector database connection (local/server/cloud modes)
 - Logging: Log levels, outputs, and file paths
 - Chat History: Conversation logging settings
@@ -25,15 +26,17 @@ class Config:
     # at startup (main.py) and by get_active_provider(). See providers.py.
     LLM_PROVIDER = os.getenv("LLM_PROVIDER", "").strip().lower()
 
-    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-    OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
-
-    # Ollama defaults to a local install. For Ollama cloud, point the base
-    # URL at https://ollama.com/v1 and set a real API key. A local Ollama
-    # has no auth, but the OpenAI SDK requires a non-empty key, so the
-    # default is a placeholder that keeps the app configured and working.
-    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-    OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
+    # Connection settings for whichever provider LLM_PROVIDER selects.
+    # One pair of settings rather than a pair per provider, so switching
+    # providers never leaves a stale OPENROUTER_* value shadowing an
+    # OLLAMA_* one.
+    #
+    # Both are left empty here on purpose: the sensible value depends on
+    # the provider, so the per-provider fallback lives with the rest of
+    # the provider knowledge in providers.PROVIDER_DEFAULTS. Unset means
+    # "use the active provider's default", not "no endpoint".
+    LLM_BASE_URL = os.getenv("LLM_BASE_URL", "").strip()
+    LLM_API_KEY = os.getenv("LLM_API_KEY")
 
     # Model used when a request specifies none. The frontend fetches this
     # from /api/status, so this is the single source of truth. It must also
