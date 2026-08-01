@@ -6,6 +6,7 @@ Service calls are mocked to isolate HTTP layer behavior.
 """
 import json
 import pytest
+import requests
 from unittest.mock import patch, MagicMock
 from chat_rag_explorer.routes import build_augmented_message, escape_xml_attr
 
@@ -695,6 +696,7 @@ class TestChatMetadataPayload:
         _, metadata = parse_chat_stream(response)
 
         assert metadata["rag"]["enabled"] is True
+        assert metadata["rag"]["error"] is None
         assert metadata["rag"]["documents_retrieved"] == 1
         assert metadata["rag"]["collection"] == "my_collection"
         assert metadata["rag"]["documents"] == ["Doc 1"]
@@ -722,3 +724,72 @@ class TestChatMetadataPayload:
         assert metadata["status"] == "error"
         assert "upstream unavailable" in metadata["error"]
         assert metadata["response"] == ""
+
+    @patch("chat_rag_explorer.routes.chat_history_service")
+    @patch("chat_rag_explorer.routes.chat_service")
+    @patch("chat_rag_explorer.routes.rag_config_service")
+    def test_rag_failure_error_included_in_metadata(self, mock_rag, mock_chat, mock_history, client):
+        """A failed retrieval carries its message so the UI can show it."""
+        mock_rag.query_collection.return_value = {
+            "success": False,
+            "message": "Could not retrieve documents from local ChromaDB at ./gone",
+            "documents": [],
+        }
+
+        def mock_stream(messages, *args, **kwargs):
+            yield ("content", "Response")
+
+        mock_chat.chat_stream.side_effect = mock_stream
+
+        response = client.post("/api/chat", json={
+            "messages": [{"role": "user", "content": "Hi"}],
+            "model": "test-model",
+            "rag_enabled": True,
+        })
+
+        _, metadata = parse_chat_stream(response)
+
+        assert metadata["rag"]["enabled"] is True
+        assert "Could not retrieve documents" in metadata["rag"]["error"]
+        assert metadata["rag"]["documents_retrieved"] == 0
+
+
+class TestChatApiKeyGuard:
+    """Tests for the /api/chat missing-API-key rejection."""
+
+    @patch("chat_rag_explorer.routes.chat_service")
+    def test_rejects_with_actionable_message_when_unconfigured(self, mock_chat, client):
+        """Without an API key the request fails fast with a helpful 503."""
+        mock_chat.is_configured.return_value = False
+
+        response = client.post("/api/chat", json={
+            "messages": [{"role": "user", "content": "Hi"}],
+        })
+
+        assert response.status_code == 503
+        assert "OPENROUTER_API_KEY" in response.get_json()["error"]
+        mock_chat.chat_stream.assert_not_called()
+
+
+class TestGetModelsErrors:
+    """Tests for /api/models misconfiguration handling."""
+
+    @patch("chat_rag_explorer.routes.chat_service")
+    def test_connection_failure_returns_helpful_message(self, mock_chat, client):
+        """An unreachable provider yields a message naming the base URL setting."""
+        mock_chat.get_models.side_effect = requests.exceptions.ConnectionError("refused")
+
+        response = client.get("/api/models")
+
+        assert response.status_code == 502
+        assert "OPENROUTER_BASE_URL" in response.get_json()["error"]
+
+    @patch("chat_rag_explorer.routes.chat_service")
+    def test_generic_failure_keeps_raw_detail(self, mock_chat, client):
+        """Unexpected failures still return the underlying error text."""
+        mock_chat.get_models.side_effect = RuntimeError("kaput")
+
+        response = client.get("/api/models")
+
+        assert response.status_code == 502
+        assert "kaput" in response.get_json()["error"]

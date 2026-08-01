@@ -664,7 +664,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!response.ok) {
                 AppLogger.error('Chat API returned error', { status: response.status });
-                throw new Error(`HTTP error! status: ${response.status}`);
+                // Error responses carry a helpful message in a JSON body
+                // (e.g. missing API key); fall back to the status code
+                let serverError = '';
+                try {
+                    serverError = (await response.json()).error || '';
+                } catch (parseError) {
+                    // Body was not JSON
+                }
+                throw new Error(serverError || `HTTP error! status: ${response.status}`);
             }
 
             AppLogger.debug('Stream started, processing chunks');
@@ -1073,64 +1081,70 @@ document.addEventListener('DOMContentLoaded', () => {
             html += '<div class="details-section">';
             html += `<div class="details-section-header">Retrieved Documents <span class="msg-count">(${docCount} from ${escapeHtml(collectionName)})</span></div>`;
 
-            // Settings summary line
-            const thresholdDisplay = distanceThreshold != null ? distanceThreshold : 'None';
-            html += '<div class="details-rag-settings">';
-            html += `<span>Results requested: <strong>${escapeHtml(nResults)}</strong></span>`;
-            html += `<span>Distance threshold: <strong>${escapeHtml(thresholdDisplay)}</strong></span>`;
-            html += '</div>';
+            // A failed retrieval replaces the settings/documents display -
+            // the threshold callouts below would be misleading on an error
+            if (metadata.rag.error) {
+                html += `<div class="details-rag-callout details-rag-callout-error">Retrieval failed: ${escapeHtml(metadata.rag.error)} The model answered without knowledge base context.</div>`;
+            } else {
+                // Settings summary line
+                const thresholdDisplay = distanceThreshold != null ? distanceThreshold : 'None';
+                html += '<div class="details-rag-settings">';
+                html += `<span>Results requested: <strong>${escapeHtml(nResults)}</strong></span>`;
+                html += `<span>Distance threshold: <strong>${escapeHtml(thresholdDisplay)}</strong></span>`;
+                html += '</div>';
 
-            // Callout when fewer results than requested
-            if (docCount < nResults) {
-                if (docCount === 0) {
-                    const thresholdNote = distanceThreshold != null
-                        ? ` (\u2264 ${escapeHtml(distanceThreshold)})`
-                        : '';
-                    html += `<div class="details-rag-callout">No documents matched within the distance threshold${thresholdNote}.</div>`;
-                } else {
-                    const thresholdNote = distanceThreshold != null
-                        ? ` (\u2264 ${escapeHtml(distanceThreshold)})`
-                        : '';
-                    html += `<div class="details-rag-callout">Only ${docCount} of ${escapeHtml(nResults)} requested documents were within the distance threshold${thresholdNote}.</div>`;
+                // Callout when fewer results than requested
+                if (docCount < nResults) {
+                    if (docCount === 0) {
+                        const thresholdNote = distanceThreshold != null
+                            ? ` (\u2264 ${escapeHtml(distanceThreshold)})`
+                            : '';
+                        html += `<div class="details-rag-callout">No documents matched within the distance threshold${thresholdNote}.</div>`;
+                    } else {
+                        const thresholdNote = distanceThreshold != null
+                            ? ` (\u2264 ${escapeHtml(distanceThreshold)})`
+                            : '';
+                        html += `<div class="details-rag-callout">Only ${docCount} of ${escapeHtml(nResults)} requested documents were within the distance threshold${thresholdNote}.</div>`;
+                    }
                 }
+
+                documents.forEach((doc, i) => {
+                    const meta = metadata.rag.metadatas && metadata.rag.metadatas[i] ? metadata.rag.metadatas[i] : {};
+                    const distance = metadata.rag.distances && metadata.rag.distances[i] !== undefined
+                        ? metadata.rag.distances[i].toFixed(4)
+                        : null;
+
+                    html += '<div class="details-rag-document">';
+
+                    // Document header with metadata
+                    html += '<div class="details-rag-header">';
+                    html += `<span class="details-rag-index">#${i + 1}</span>`;
+                    if (meta.title) {
+                        html += `<span class="details-rag-title">${escapeHtml(meta.title)}</span>`;
+                    }
+                    if (distance !== null) {
+                        html += `<span class="details-rag-distance">dist: ${distance}</span>`;
+                    }
+                    html += '</div>';
+
+                    // Metadata fields (if any exist)
+                    const metaFields = [];
+                    if (meta.section_title) metaFields.push(`Section: ${escapeHtml(meta.section_title)}`);
+                    if (meta.section_number) metaFields.push(`#${escapeHtml(meta.section_number)}`);
+                    if (meta.author) metaFields.push(`Author: ${escapeHtml(meta.author)}`);
+                    const safeUrl = meta.url ? sanitizeUrl(meta.url) : '';
+                    if (safeUrl) metaFields.push(`<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">Source</a>`);
+
+                    if (metaFields.length > 0) {
+                        html += `<div class="details-rag-meta">${metaFields.join(' · ')}</div>`;
+                    }
+
+                    // Document content (truncated preview)
+                    const preview = doc.length > 300 ? doc.substring(0, 300) + '...' : doc;
+                    html += `<div class="details-rag-content">${escapeHtml(preview)}</div>`;
+                    html += '</div>';
+                });
             }
-
-            documents.forEach((doc, i) => {
-                const meta = metadata.rag.metadatas && metadata.rag.metadatas[i] ? metadata.rag.metadatas[i] : {};
-                const distance = metadata.rag.distances && metadata.rag.distances[i] !== undefined
-                    ? metadata.rag.distances[i].toFixed(4)
-                    : null;
-
-                html += '<div class="details-rag-document">';
-
-                // Document header with metadata
-                html += '<div class="details-rag-header">';
-                html += `<span class="details-rag-index">#${i + 1}</span>`;
-                if (meta.title) {
-                    html += `<span class="details-rag-title">${escapeHtml(meta.title)}</span>`;
-                }
-                if (distance !== null) {
-                    html += `<span class="details-rag-distance">dist: ${distance}</span>`;
-                }
-                html += '</div>';
-
-                // Metadata fields (if any exist)
-                const metaFields = [];
-                if (meta.section_title) metaFields.push(`Section: ${escapeHtml(meta.section_title)}`);
-                if (meta.section_number) metaFields.push(`#${escapeHtml(meta.section_number)}`);
-                if (meta.author) metaFields.push(`Author: ${escapeHtml(meta.author)}`);
-                const safeUrl = meta.url ? sanitizeUrl(meta.url) : '';
-                if (safeUrl) metaFields.push(`<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener">Source</a>`);
-
-                if (metaFields.length > 0) {
-                    html += `<div class="details-rag-meta">${metaFields.join(' · ')}</div>`;
-                }
-
-                // Document content (truncated preview)
-                const preview = doc.length > 300 ? doc.substring(0, 300) + '...' : doc;
-                html += `<div class="details-rag-content">${escapeHtml(preview)}</div>`;
-                html += '</div>';
-            });
 
             html += '</div>';
         }
@@ -1245,12 +1259,18 @@ document.addEventListener('DOMContentLoaded', () => {
      * Render RAG context as a simple label.
      * Full document content is visible in "View Details" modal.
      * Shows label even when 0 documents returned so users know RAG was attempted.
+     * A failed retrieval renders a warning so misconfiguration is visible
+     * instead of looking like a healthy query with no matches.
      * @param {Object} ragData - RAG metadata from response
      * @returns {string} HTML string for the RAG context label
      */
     function renderRagContext(ragData) {
         if (!ragData || !ragData.enabled) {
             return '';
+        }
+
+        if (ragData.error) {
+            return `<div class="rag-context-label rag-context-error">&#9888; Knowledge base retrieval failed &mdash; the model answered without RAG context. ${escapeHtml(ragData.error)}</div>`;
         }
 
         const docCount = ragData.documents ? ragData.documents.length : 0;

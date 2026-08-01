@@ -339,6 +339,13 @@ class RagConfigService:
             path = config_data.get('local_path')
             if not path:
                 raise ValueError('Local path is required')
+            # PersistentClient silently creates an empty database at a
+            # missing path, so a stale path would fail later with a
+            # confusing "collection does not exist" error. Validate first
+            # so the user sees the real problem: the path is wrong.
+            validation = self.validate_local_path(path, request_id)
+            if not validation['valid']:
+                raise ValueError(f"{validation['message']}: {path}")
             return chromadb.PersistentClient(path=path)
 
         elif mode == 'server':
@@ -506,7 +513,10 @@ class RagConfigService:
             logger.error(f"{log_prefix}RAG query failed: {e}")
             return {
                 'success': False,
-                'message': str(e),
+                'message': (
+                    f"Could not retrieve documents from {_describe_target(config)}: {e}. "
+                    f"Check the RAG configuration in Settings."
+                ),
                 'documents': [],
                 'metadatas': [],
                 'distances': [],

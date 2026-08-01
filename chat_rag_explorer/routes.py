@@ -25,6 +25,8 @@ import time
 import uuid
 from flask import Blueprint, current_app, g, render_template, request, Response, stream_with_context, jsonify
 from werkzeug.exceptions import HTTPException
+from chat_rag_explorer.error_messages import describe_model_list_error, missing_api_key_message
+from chat_rag_explorer.providers import get_active_provider
 from chat_rag_explorer.services import chat_service, get_models_list_status
 from chat_rag_explorer.prompt_service import prompt_service
 from chat_rag_explorer.rag_config_service import rag_config_service
@@ -185,7 +187,9 @@ def build_rag_metadata(rag_result):
         rag_result: Result dict from query_collection, or None if no query ran
 
     Returns:
-        Metadata dict with retrieval details, or None when rag_result is None
+        Metadata dict with retrieval details, or None when rag_result is None.
+        On a failed query, "error" carries the message so the frontend can
+        tell the user retrieval failed instead of showing "0 documents".
     """
     if not rag_result:
         return None
@@ -193,6 +197,7 @@ def build_rag_metadata(rag_result):
     documents = rag_result.get("documents") or []
     return {
         "enabled": True,
+        "error": None if rag_result.get("success") else rag_result.get("message"),
         "documents_retrieved": len(documents),
         "collection": rag_result.get("collection"),
         "documents": documents,
@@ -241,7 +246,13 @@ def get_status():
 def get_models():
     logger.info(f"[{g.request_id}] GET /api/models - Fetching available models")
 
-    models = chat_service.get_models(g.request_id)
+    try:
+        models = chat_service.get_models(g.request_id)
+    except Exception as e:
+        message = describe_model_list_error(e, get_active_provider())
+        logger.error(f"[{g.request_id}] GET /api/models - Failed: {message} ({request_elapsed():.3f}s)")
+        return jsonify({"error": message}), 502
+
     models_list_status = get_models_list_status()
 
     logger.info(f"[{g.request_id}] GET /api/models - Returned {len(models)} models ({request_elapsed():.3f}s)")
@@ -375,6 +386,11 @@ def chat():
     if not messages:
         logger.warning(f"[{request_id}] POST /api/chat - Rejected: no messages provided")
         return {"error": "Messages are required"}, 400
+
+    if not chat_service.is_configured():
+        message = missing_api_key_message(get_active_provider())
+        logger.warning(f"[{request_id}] POST /api/chat - Rejected: {message}")
+        return jsonify({"error": message}), 503
 
     if not model:
         logger.warning(f"[{request_id}] POST /api/chat - No model specified, will use default")

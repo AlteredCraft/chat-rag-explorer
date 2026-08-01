@@ -203,8 +203,17 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('/api/models');
             if (!response.ok) {
-                SettingsLogger.error('Models API returned error', { status: response.status });
-                throw new Error(`HTTP error! status: ${response.status}`);
+                // Error responses carry a helpful message in a JSON body
+                // (e.g. bad API key, unreachable provider); fall back to
+                // the status code
+                let serverError = '';
+                try {
+                    serverError = (await response.json()).error || '';
+                } catch (parseError) {
+                    // Body was not JSON
+                }
+                SettingsLogger.error('Models API returned error', { status: response.status, serverError });
+                throw new Error(serverError || `HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
@@ -232,10 +241,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadTime_ms: elapsed.toFixed(2)
             });
             modelSelect.innerHTML = '<option value="">Failed to load models</option>';
+            showModelsLoadError(error.message);
         } finally {
             loadingIndicator.classList.remove('active');
             modelSelect.disabled = false;
         }
+    }
+
+    /**
+     * Show the reason model loading failed in the info box, so the user
+     * gets the actionable message from the backend instead of just a
+     * "Failed to load models" placeholder.
+     */
+    function showModelsLoadError(message) {
+        if (!modelsListInfo) return;
+
+        modelsListInfo.style.display = 'flex';
+        modelsListInfo.classList.remove('info-box-active', 'info-box-neutral');
+        modelsListInfo.classList.add('info-box-error');
+        modelsListTitle.textContent = 'Could Not Load Models';
+        modelsListDescription.textContent = message;
     }
 
     function updateModelsListInfo(modelsListStatus) {
@@ -243,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (modelsListStatus.exists) {
             modelsListInfo.style.display = 'flex';
-            modelsListInfo.classList.remove('info-box-neutral');
+            modelsListInfo.classList.remove('info-box-neutral', 'info-box-error');
             modelsListInfo.classList.add('info-box-active');
             modelsListTitle.textContent = 'Curated Model List Active';
             modelsListDescription.innerHTML = `
@@ -255,7 +280,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         } else {
             modelsListInfo.style.display = 'flex';
-            modelsListInfo.classList.remove('info-box-active');
+            modelsListInfo.classList.remove('info-box-active', 'info-box-error');
             modelsListInfo.classList.add('info-box-neutral');
             modelsListTitle.textContent = 'All Models Available';
             modelsListDescription.innerHTML = `
